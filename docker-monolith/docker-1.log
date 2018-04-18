@@ -1,0 +1,15 @@
+REPOSITORY                 TAG                 IMAGE ID            CREATED             SIZE
+spinor72/ubuntu-tmp-file   latest              92173dbed1f0        52 seconds ago      113MB
+ubuntu                     16.04               c9d990395902        5 days ago          113MB
+hello-world                latest              e38bc07ac18e        7 days ago          1.85kB
+
+Образ это как шаблон для формирования контейнера
+Образ имеет слои (RootFS Layers) , 
+id контейнера из которого создан
+id родительского образа контейнера(если есть)
+параметры репозитория
+
+Контейнер имеет состояние запуска (State), 
+опции запуска и лимиты ресурсов (HostConfig) , 
+настройки сети (NetworkSettings), 
+id родительского образа из которого порожден контейнер
