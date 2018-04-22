@@ -1,0 +1,17 @@
+---
+- name: install docker
+  hosts: all
+  become: true
+
+  roles:
+    - geerlingguy.docker
+
+  tasks:
+    - name: Install pip
+      apt:
+        name: python-pip
+        state: present
+
+    - name: Install docker-py
+      pip:
+        name: docker-py

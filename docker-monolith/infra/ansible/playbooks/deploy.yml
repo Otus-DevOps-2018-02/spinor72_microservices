@@ -1,0 +1,16 @@
+---
+- name: Docker container run
+  hosts: all
+  become: true
+  gather_facts: False
+
+  tasks:
+    - name: Deploy docker container from Docker Hub
+      docker_container:
+        name: reddit
+        image: spinor72/otus-reddit:1.0
+        pull: yes
+        state: started
+        restart: yes
+        ports:
+        - "9292:9292"

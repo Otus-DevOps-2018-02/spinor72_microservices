@@ -1,0 +1,40 @@
+{
+  "variables": {
+    "project_id": null,
+    "source_image_family": null,
+    "machine_type": null,
+    "disk_size": "10",
+    "disk_type": "pd-standard",
+    "network": "default",
+    "zone": "europe-west4-a"
+  },
+  "builders": [
+    {
+    "image_description": "Docker base image",
+    "type": "googlecompute",
+    "project_id": "{{user `project_id`}}",
+    "image_name": "reddit-docker-base-{{isotime | clean_image_name}}",
+    "image_family": "reddit-docker-base",
+    "source_image_family": "{{user `source_image_family`}}",
+    "zone": "{{user `zone`}}",
+    "ssh_username": "appuser",
+    "ssh_timeout": "35s",
+    "ssh_port": 22,
+    "machine_type": "{{user `machine_type`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "disk_type": "{{user `disk_type`}}",
+    "network": "{{user `network`}}",
+	"tags": [
+      "docker"
+    ]
+    }
+  ],
+  "provisioners": [
+    {
+    "type": "ansible",
+    "playbook_file": "ansible/playbooks/packer_docker.yml",
+    "ansible_env_vars": [ "ANSIBLE_ROLES_PATH=ansible/roles"],
+    "extra_arguments": ["--extra-vars", "docker_edition=ce docker_install_compose=false"]
+    }
+    ]
+}
