@@ -64,15 +64,9 @@ def print_list(data):
                 names = host.get('names').get('value')
                 if host.get('hosts'):
                     ansible_hosts = host.get('hosts').get('value', [])
-                    # print zip(names, ansible_hosts)
                     for z in zip(names, ansible_hosts):
-                        # print z[1], z[0]
                         inventory["_meta"]["hostvars"][z[0]] = {}
                         inventory["_meta"]["hostvars"][z[0]]['ansible_host'] = z[1]
-                        # print inventory
-
-
-
 
             if host.get('groups'):
                 for g in host.get('groups').get('value', []):

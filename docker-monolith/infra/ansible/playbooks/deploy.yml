@@ -8,9 +8,9 @@
     - name: Deploy docker container from Docker Hub
       docker_container:
         name: reddit
-        image: spinor72/otus-reddit:1.0
+        image: "{{ docker_container_image }}"
         pull: yes
         state: started
         restart: yes
         ports:
-        - "9292:9292"
+        - "{{ docker_container_extport }}:{{ docker_container_intport }}"
