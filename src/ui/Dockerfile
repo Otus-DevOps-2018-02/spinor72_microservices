@@ -4,7 +4,7 @@ ENV APP_HOME /app
 RUN mkdir "$APP_HOME"
 
 WORKDIR $APP_HOME
-# копирую файл зависимостей чтобы сруз установить их и удалить бандлер в один проход с пакетами
+# копирую файл зависимостей чтобы сразу установить их и удалить бандлер в один проход с пакетами
 COPY Gemfile* $APP_HOME/
 # не проверяется DL3018 Pin versions in apk add. Instead of `apk add <package>` use `apk add <package>=<version>`
 # hadolint ignore=DL3018
