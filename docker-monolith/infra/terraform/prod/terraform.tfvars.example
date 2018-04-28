@@ -1,0 +1,13 @@
+project = "your-project"
+
+region = "your-region"
+
+zone = "your-region-x"
+
+public_key_path = "~/.ssh/appuser.pub"
+
+private_key_path = "~/.ssh/appuser"
+
+docker_disk_image = "ubuntu-1604-lts"
+
+docker_count = 2

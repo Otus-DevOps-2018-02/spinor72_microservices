@@ -1,0 +1,4 @@
+env: prod
+docker_container_image: spinor72/otus-reddit:1.0
+docker_container_extport: 9292
+docker_container_intport: 9292
