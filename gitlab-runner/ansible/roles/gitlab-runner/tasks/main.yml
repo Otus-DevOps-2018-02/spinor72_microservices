@@ -1,0 +1,17 @@
+---
+# tasks file for gitlab-runner
+
+- name: Add an apt key for gitlab repo
+  apt_key:
+    url: https://packages.gitlab.com/runner/gitlab-runner/gpgkey
+    state: present
+
+- name: Add gitlab repository
+  apt_repository:
+    repo: deb https://packages.gitlab.com/runner/gitlab-runner/ubuntu/ xenial main
+    state: present
+
+- name: Install gitlab-runner
+  apt:
+    name: gitlab-runner
+    state:  present

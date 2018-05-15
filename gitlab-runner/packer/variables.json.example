@@ -1,0 +1,6 @@
+{
+    "project_id": "docker-00000",
+    "source_image_family": "ubuntu-1604-lts",
+    "machine_type": "n1-standard-1"
+    "zone": "europe-west4-b"
+}
