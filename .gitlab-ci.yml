@@ -46,7 +46,7 @@ staging:
     - echo 'Deploy'
   environment:
     name: stage
-  url: https://beta.example.com
+    url: https://beta.example.com
 
 production:
   stage: production
