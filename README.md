@@ -192,3 +192,56 @@ _После проверки удалить ненужные инстансы к
 Перейти по ссылке `http://<host_ip>:9292`  , где host_ip это localhost, при локальном запуске контейнеров или ip-адрес хоста созданного docker-machine
 
 Должен открыться интерфейс тестового приложения в котором можно делать посты и комментарии
+
+
+## ДЗ №17 Устройство Gitlab CI. Построение процесса непрерывной интеграции.
+
+ - [x] Основное ДЗ
+ - [x] Задание со *
+ 
+### В процессе сделано:
+
+ - Для работы с Gitlab CE поднят инстанс gitlab-host с помощью  docker-machine
+    ```
+    docker-machine create --driver google --google-disk-size 100 \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west4-b \
+    gitlab-host
+    ```
+ - На созданном хосте, используя docker-compose развернут контейнер с сервисом Gitlab в  версии Omnnibus Gitlab
+ - Выполнена первичная настройка gitlab
+ - Созданы тестовые группа `homework` и проект `example`
+ - В  "microservices"-репозиторий добавлен файл описания CI/CD Pipeline `.gitlab-ci.yml` 
+ - Добавлен раннер в виде докер-сервиса и зарегистрирован для использования в CI/CD pipline тестового проекта на Gitlab
+ - В приложение reddit добавлены тесты и необходимые библиотеки для тестирования
+ - "microservices"-репозиторий синхронизирован в тестовый проект на gitlab
+ - проверено что изменение кода в папке приложения reddit привозит к запуску pipeline и оно корректно срабатывает 
+
+Для задания со * 
+
+ - Для автоматического масштабирования раннеров можно использовать возможность autoscaling раннеров https://docs.gitlab.com/runner/configuration/autoscale.html 
+ - Можно генерировать инфраструктуру раннеров с помощью terrafrom, образ с "запеченным" раннером и докером делаем пакером. Пример приведен в папке /gitlab-runner . Но если предполагается изменение инфрастурктуры то, видимо,нужно еще синхронизировать наличие раннеров с gitlab, например удалять отсутствующие. Для этого можно использовать API Gitlab и соответственно написать скрипт.
+ 
+ - Настроена интеграция Pipeline с тестовым  Slack-чатом 
+
+
+### Как запустить проект:
+
+ - Установить или использовать готовую утсановку Gitlab пусть это бует адрес  http://<gitlab-ip>
+ - Создать группу и проект /homework/example
+ - Добавить к тееущему "microservices"-репозиторию удаленный репозиторий на gitlab
+    `git remote add gitlab http://<gitlab-ip>/homework/example.git `
+    `git push gitlab gitlab-ci-1`
+ -  создать и зарегистрировать раннер , например, с помощью пакер и терраформ из папки gitlab-runner 
+     - Задать свои значения переменных в `/gitlab-runner/packer/variables.json`, для образца использовать example-файл
+     - Перейти в папку `/gitlab-runner` и создать образ пакером `packer build -var-file=packer/variables.json packer/gitlab-runner.json`
+     - В папке `/gitlab-runner/terraform`  создать файл `terraform.tfvars`со своими значеними переменных (для образца использовать example-файл и кроме параметров GCP, необходимо указать адрес http://<gitlab-ip> и токен для регистрации gitlab  а также количество раннеров в переменной `count`) и запустить создание инфраструктуры раннеров терраформом (`terraform init` , `terraform apply`)
+    - в settings/ci_cd проекта должны появитьcя зарегистрированные раннеры
+ 
+
+### Как проверить работоспособность:
+
+Убедиться, что 
+ - Теперь будет автоматически стартовать pipeline при коммите  в репозиторий (после отправки изменений в gitlab). Также можно запустить pipeline вручную
+ - В slack-канал https://devops-team-otus.slack.com/messages/C9NT0JMSA должны приходить уведомления от gitlab
