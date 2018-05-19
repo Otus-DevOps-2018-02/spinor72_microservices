@@ -1,0 +1,14 @@
+version: '3.3'
+# Задать переменную SRC_PATH, для указания пути к новым исходникам микросервисов
+services:
+  ui:
+    command: "puma --debug -w 2"
+    volumes:
+      - ${SRC_PATH:-.}/ui:/app
+  post:
+    volumes:
+      - ${SRC_PATH:-.}/post-py:/app
+  comment:
+    command: "puma --debug -w 2"
+    volumes:
+      - ${SRC_PATH:-.}/comment:/app
