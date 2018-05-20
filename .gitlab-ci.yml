@@ -9,27 +9,24 @@ stages:
 
 variables:
   DATABASE_URL: 'mongodb://mongo/user_posts'
-  GITLAB_REGISTRY: '10.164.0.3:4567'
+  GITLAB_REGISTRY: 'gitlab-host:4567'
 
 before_script:
   - cd reddit
-  - bundle install
 
 build_job:
   image: docker:latest
   stage: build
+  variables:
+    DOCKER_OPTS: "--insecure-registry=${GITLAB_REGISTRY}"
+
   services:
-  - docker:dind
+    - name: lordgaav/dind-options:latest
+      alias: docker
   script:
     - echo 'Building'
-    - cd reddit
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
-    # - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN ${GITLAB_REGISTRY}
-    # - docker login --username ${DOCKER_USER} --password ${DOCKER_PASS}
-    # - docker build -t ${DOCKER_USER}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} docker-monolith
-    # - docker push ${DOCKER_USER}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
-    - docker build -t ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} .
-    # - docker run registry.example.com/my-group/my-project /script/to/run/tests
+    - docker build -t ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} ../docker-monolith
     - docker push ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
 
 test_unit_job:
@@ -37,6 +34,7 @@ test_unit_job:
   services:
     - mongo:latest
   script:
+    - bundle install
     - ruby simpletest.rb
 
 test_integration_job:
