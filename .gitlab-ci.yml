@@ -9,7 +9,7 @@ stages:
 
 variables:
   DATABASE_URL: 'mongodb://mongo/user_posts'
-  GITLAB_REGISTRY: '10.164.0.3:4567'
+  GITLAB_REGISTRY: 'gitlab-host:4567'
 
 before_script:
   - cd reddit
