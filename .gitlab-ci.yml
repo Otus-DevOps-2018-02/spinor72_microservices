@@ -63,7 +63,7 @@ branch review:
     - docker-machine
   stage: review
   variables:
-    DOCKER_MACHINE_ENV: 'docker-machine env reddit-${CI_COMMIT_REF_NAME}'
+    DOCKER_MACHINE_ENV: 'docker-machine env reddit-deploy-${CI_COMMIT_REF_NAME}'
   script:
     - echo "Deploy to $CI_ENVIRONMENT_SLUG"
     - docker-machine create --driver google --google-disk-size 100 --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts  --google-machine-type n1-standard-1 --google-zone europe-west4-b --google-project docker-spinor72 reddit-deploy-${CI_COMMIT_REF_NAME}
@@ -86,7 +86,7 @@ delete_server:
     - docker-machine
   stage: review
   script:
-    - docker-machine rm -y -f reddit-deploy-{CI_COMMIT_REF_NAME}
+    - docker-machine rm -f reddit-deploy-{CI_COMMIT_REF_NAME}
   when: manual
   environment:
     name: branch/$CI_COMMIT_REF_NAME
