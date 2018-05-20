@@ -51,8 +51,15 @@ deploy_dev_job:
     url: http://dev.example.com
 
 branch review:
+  tags:
+    - docker-machine
   stage: review
-  script: echo "Deploy to $CI_ENVIRONMENT_SLUG"
+  script:
+    - echo "Deploy to $CI_ENVIRONMENT_SLUG"
+    - docker-machine create --driver google --google-disk-size 100 --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts  --google-machine-type n1-standard-1 --google-zone europe-west4-b --google-project docker-spinor72 reddit-deploy-${CI_COMMIT_REF_NAME}
+    - eval (docker-machine env reddit-${CI_COMMIT_REF_NAME})
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
+    - docker run -d -p 9292:9292 --name reddit ${GITLAB_REGISTRY}/homework/example2/reddit:${CI_COMMIT_REF_NAME}
   environment:
     name: branch/$CI_COMMIT_REF_NAME
     url: http://$CI_ENVIRONMENT_SLUG.example.com
@@ -60,6 +67,16 @@ branch review:
     - branches
   except:
     - master
+
+delete_server:
+  stage: review
+  script:
+    - docker-machine rm reddit-{CI_COMMIT_REF_NAME}
+  when: manual
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: http://$CI_ENVIRONMENT_SLUG.example.com
+    action: stop
 
 staging:
   stage: stage
