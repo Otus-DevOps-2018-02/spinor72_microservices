@@ -1,0 +1,8 @@
+---
+# tasks file for docker-machine
+- name: "docker-machine: Install"
+  get_url:
+    url: "{{ docker_machine_url }}/{{ docker_machine_version }}/docker-machine-Linux-x86_64"
+    dest: /usr/local/bin/docker-machine
+    mode: 0755
+  become: yes

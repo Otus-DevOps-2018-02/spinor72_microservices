@@ -43,6 +43,14 @@ variable gitlab_runner_registration_token {
   description = "Runner token"
 }
 
+variable gitlab_registry_address {
+  description = "Gitlab docker registry address"
+}
+
+variable gitlab_registry_port {
+  description = "Gitlab docker registry port"
+}
+
 variable machine_type {
   description = "Machine type"
   default     = "n1-standard-1"
