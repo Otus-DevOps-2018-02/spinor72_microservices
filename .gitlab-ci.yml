@@ -87,7 +87,7 @@ delete_server:
     - docker-machine
   stage: review
   script:
-    - docker-machine rm -f reddit-deploy-{CI_COMMIT_REF_NAME}
+    - docker-machine rm -f reddit-deploy-${CI_COMMIT_REF_NAME}
   when: manual
   environment:
     name: branch/$CI_COMMIT_REF_NAME
