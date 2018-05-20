@@ -26,8 +26,8 @@ build_job:
   script:
     - echo 'Building'
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
-    - docker build -t ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} ../docker-monolith
-    - docker push ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
+    - docker build -t ${GITLAB_REGISTRY}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} ../docker-monolith
+    - docker push ${GITLAB_REGISTRY}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
 
 test_unit_job:
   stage: test
