@@ -18,8 +18,10 @@ before_script:
 build_job:
   image: docker:latest
   stage: build
+  
   services:
-  - docker:dind
+  - name: docker:dind
+    command: ["dockerd-entrypoint.sh --insecure-registry=${GITLAB_REGISTRY}"]
   script:
     - echo 'Building'
  #   - cd reddit
