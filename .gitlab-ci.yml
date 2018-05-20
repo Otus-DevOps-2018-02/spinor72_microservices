@@ -30,7 +30,7 @@ build_job:
     # - docker login --username ${DOCKER_USER} --password ${DOCKER_PASS}
     # - docker build -t ${DOCKER_USER}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} docker-monolith
     # - docker push ${DOCKER_USER}/reddit:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
-    - docker build -t ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} .
+    - docker build -t ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID} ../docker-monolith
     # - docker run registry.example.com/my-group/my-project /script/to/run/tests
     - docker push ${GITLAB_REGISTRY}/homework/example2:${CI_COMMIT_REF_NAME}-${CI_PIPELINE_ID}
 
