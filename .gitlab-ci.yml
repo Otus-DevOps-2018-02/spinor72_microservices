@@ -62,10 +62,12 @@ branch review:
   tags:
     - docker-machine
   stage: review
+  variables:
+    DOCKER_MACHINE_ENV: 'docker-machine env reddit-${CI_COMMIT_REF_NAME}'
   script:
     - echo "Deploy to $CI_ENVIRONMENT_SLUG"
     - docker-machine create --driver google --google-disk-size 100 --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts  --google-machine-type n1-standard-1 --google-zone europe-west4-b --google-project docker-spinor72 reddit-deploy-${CI_COMMIT_REF_NAME}
-    - eval (docker-machine env reddit-${CI_COMMIT_REF_NAME})
+    - eval $DOCKER_MACHINE_ENV
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
     - docker run -d -p 9292:9292 --name reddit ${GITLAB_REGISTRY}/homework/example2/reddit:${CI_COMMIT_REF_NAME}
   environment:
