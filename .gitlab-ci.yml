@@ -13,7 +13,7 @@ variables:
 
 before_script:
   - cd reddit
-  - bundle install
+#  - bundle install
 
 build_job:
   image: docker:latest
@@ -22,7 +22,7 @@ build_job:
   - docker:dind
   script:
     - echo 'Building'
-    - cd reddit
+ #   - cd reddit
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
     # - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN ${GITLAB_REGISTRY}
     # - docker login --username ${DOCKER_USER} --password ${DOCKER_PASS}
@@ -37,6 +37,7 @@ test_unit_job:
   services:
     - mongo:latest
   script:
+    - bundle install
     - ruby simpletest.rb
 
 test_integration_job:
