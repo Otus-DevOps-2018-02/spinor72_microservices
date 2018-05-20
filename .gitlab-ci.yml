@@ -15,6 +15,8 @@ before_script:
   - cd reddit
 
 build_job:
+  tags:
+    - docker
   image: docker:latest
   stage: build
   variables:
@@ -30,6 +32,8 @@ build_job:
     - docker push ${GITLAB_REGISTRY}/homework/example2/reddit:${CI_COMMIT_REF_NAME}
 
 test_unit_job:
+  tags:
+    - docker
   stage: test
   services:
     - mongo:latest
@@ -38,11 +42,15 @@ test_unit_job:
     - ruby simpletest.rb
 
 test_integration_job:
+  tags:
+    - docker
   stage: test
   script:
     - echo 'Testing 2'
 
 deploy_dev_job:
+  tags:
+    - docker
   stage: review
   script:
     - echo 'Deploy'
@@ -69,6 +77,8 @@ branch review:
     - master
 
 delete_server:
+  tags:
+    - docker-machine
   stage: review
   script:
     - docker-machine rm reddit-{CI_COMMIT_REF_NAME}
