@@ -78,12 +78,15 @@ branch review:
   except:
     - master
 
+
+
+
 delete_server:
   tags:
     - docker-machine
   stage: review
   script:
-    - docker-machine rm -y reddit-{CI_COMMIT_REF_NAME}
+    - docker-machine rm -y reddit-deploy-{CI_COMMIT_REF_NAME}
   when: manual
   environment:
     name: branch/$CI_COMMIT_REF_NAME
