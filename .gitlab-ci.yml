@@ -72,6 +72,9 @@ branch review:
     - eval $(docker-machine env reddit-deploy-${CI_COMMIT_REF_NAME})
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
     - docker run -d -p 9292:9292 --name reddit ${GITLAB_REGISTRY}/homework/example2/reddit:${CI_COMMIT_REF_NAME}
+    # - cd reddit
+    # - docker-compose down
+    # - docker-compose up -d
   environment:
     name: branch/$CI_COMMIT_REF_NAME
     url: http://$CI_ENVIRONMENT_SLUG.example.com
