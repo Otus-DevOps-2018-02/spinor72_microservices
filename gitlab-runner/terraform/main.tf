@@ -49,7 +49,7 @@ resource "google_compute_instance" "gitlab-runner" {
     inline = [
       "sudo cp /tmp/daemon.json /etc/docker/daemon.json",
       "sudo systemctl restart docker",
-      "sudo gitlab-runner register --non-interactive --url ${var.gitlab_runner_url} --registration-token ${var.gitlab_runner_registration_token} --executor \"docker\" --docker-image alpine:latest --description \"docker-runner-${count.index}\" --tag-list \"docker,linux,ubuntu,xenial\" --run-untagged --locked=\"false\" ",
+      "sudo gitlab-runner register --non-interactive --url ${var.gitlab_runner_url} --registration-token ${var.gitlab_runner_registration_token} --executor \"docker\" --docker-image alpine:latest --description \"docker-runner-${count.index}\" --tag-list \"docker,linux,ubuntu,xenial\" --run-untagged --locked=\"false\" --docker-privileged ",
     ]
   }
 }
