@@ -1,0 +1,72 @@
+---
+services:
+  post_db:
+    image: mongo:${MONGO_VERSION}
+    volumes:
+      - post_db:/data/db
+    networks:
+      net_back:
+        aliases:
+          - post_db
+          - comment_db
+  ui:
+    image: ${DOCKERHUB_USERNAME}/ui:${UI_VERSION}
+    ports:
+      - ${UI_PORT}:${UI_PORT}/tcp
+    networks:
+      net_front:
+
+  post:
+    image: ${DOCKERHUB_USERNAME}/post:${POST_VERSION}
+    networks:
+      net_back:
+        aliases:
+          - post
+      net_front:
+        aliases:
+          - post
+  comment:
+    image: ${DOCKERHUB_USERNAME}/comment:${COMMENT_VERSION}
+    networks:
+      net_back:
+        aliases:
+          - comment
+      net_front:
+        aliases:
+          - comment
+  prometheus:
+    image: ${USERNAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      net_back:
+        aliases:
+          - prometheus
+      net_front:
+        aliases:
+          - prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+
+volumes:
+  post_db:
+  prometheus_data:
+
+networks:
+  net_back:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.2.0/24
+
+  net_front:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.1.0/24
