@@ -15,6 +15,7 @@ variables:
   GCP_ZONE: 'europe-west4-b'
 
 before_script:
+  - export
   - cd reddit
 
 build_job:
@@ -72,8 +73,8 @@ branch review:
     - eval $(docker-machine env reddit-deploy-${CI_COMMIT_REF_NAME})
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
     # - docker run -d -p 9292:9292 --name reddit ${GITLAB_REGISTRY}/homework/example2/reddit:${CI_COMMIT_REF_NAME}
-    - cd reddit
-    # - export GITLAB_REGISTRY=${GITLAB_REGISTRY}
+    # - cd reddit
+    - export GITLAB_REGISTRY=${GITLAB_REGISTRY}
     - docker-compose down
     - docker-compose up -d
   environment:
@@ -96,6 +97,10 @@ delete_server:
     name: branch/$CI_COMMIT_REF_NAME
     url: http://$CI_ENVIRONMENT_SLUG.example.com
     action: stop
+  only:
+    - branches
+  except:
+    - master
 
 staging:
   stage: stage
