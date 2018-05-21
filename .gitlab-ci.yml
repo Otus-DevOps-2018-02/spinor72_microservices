@@ -9,10 +9,11 @@ stages:
 
 variables:
   DATABASE_URL: 'mongodb://mongo/user_posts'
-  GITLAB_REGISTRY: 'gitlab-host:4567'
-  GCP_PROJECT: 'docker-spinor72'
+  # set this in Secret variables  settings/ci_cd 
+  # GITLAB_REGISTRY: 'gitlab-host:4567'
+  # GCP_PROJECT: 'docker-spinor72'
+  # GCP_ZONE: 'europe-west4-b'
   GCP_IMAGE: 'https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts'
-  GCP_ZONE: 'europe-west4-b'
 
 before_script:
   - export
