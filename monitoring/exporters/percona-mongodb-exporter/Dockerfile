@@ -1,9 +1,10 @@
-FROM       golang:alpine as builder
+FROM golang:alpine as builder
 
-ENV PERCONA_MONGODB_EXPORTER_VERSION "v0.4.0"
+ARG PERCONA_MONGODB_EXPORTER_VERSION
 
 RUN apk --no-cache add git make gcc build-base
 WORKDIR /go/src/github.com/percona
+
 RUN git clone  --branch $PERCONA_MONGODB_EXPORTER_VERSION --depth 1  https://github.com/percona/mongodb_exporter.git
 RUN cd mongodb_exporter && make build
 

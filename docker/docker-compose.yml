@@ -37,7 +37,7 @@ services:
           - comment
 
   prometheus:
-    image: ${USER_NAME}/prometheus
+    image: ${DOCKERHUB_USERNAME}/prometheus
     ports:
       - '9090:9090'
     volumes:
@@ -58,7 +58,7 @@ services:
       - '--storage.tsdb.retention=1d'
 
   mongodb-exporter:
-    image: ${USER_NAME}/prometheus-mongodb-exporter:latest
+    image: ${DOCKERHUB_USERNAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}
     environment:
       MONGODB_URL: mongodb://post_db
     networks:
@@ -68,6 +68,16 @@ services:
       net_back:
         aliases:
           - mongodb-exporter
+
+  cloudprober-exporter:
+    image: ${DOCKERHUB_USERNAME}/google-cloudprober:${CLOUDPROBER_VERSION}
+    networks:
+      net_mon:
+        aliases:
+          - cloudprober-exporter
+      net_front:
+        aliases:
+          - cloudprober-exporter
 
   node-exporter:
     image: prom/node-exporter:v0.15.2
