@@ -1,4 +1,4 @@
----
+version: '3.3'
 services:
   post_db:
     image: mongo:${MONGO_VERSION}
@@ -25,6 +25,7 @@ services:
       net_front:
         aliases:
           - post
+
   comment:
     image: ${DOCKERHUB_USERNAME}/comment:${COMMENT_VERSION}
     networks:
@@ -34,8 +35,9 @@ services:
       net_front:
         aliases:
           - comment
+
   prometheus:
-    image: ${USERNAME}/prometheus
+    image: ${USER_NAME}/prometheus
     ports:
       - '9090:9090'
     volumes:
@@ -47,10 +49,42 @@ services:
       net_front:
         aliases:
           - prometheus
+      net_mon:
+        aliases:
+          - prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention=1d'
+
+  mongodb-exporter:
+    image: ${USER_NAME}/prometheus-mongodb-exporter:latest
+    environment:
+      MONGODB_URL: mongodb://post_db
+    networks:
+      net_mon:
+        aliases:
+          - mongodb-exporter
+      net_back:
+        aliases:
+          - mongodb-exporter
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      net_mon:
+        aliases:
+          - node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
 
 volumes:
   post_db:
@@ -70,3 +104,10 @@ networks:
       driver: default
       config:
       - subnet: 10.0.1.0/24
+
+  net_mon:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.3.0/24
