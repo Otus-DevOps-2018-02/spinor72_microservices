@@ -5,10 +5,12 @@ web:
   environment:
     GITLAB_OMNIBUS_CONFIG: |
       external_url 'http://35.204.114.42'
+      registry_external_url 'http://35.204.114.42:4567'
   ports:
     - '80:80'
     - '443:443'
     - '2222:22'
+    - '4567:4567'
   volumes:
     - '/srv/gitlab/config:/etc/gitlab'
     - '/srv/gitlab/logs:/var/log/gitlab'

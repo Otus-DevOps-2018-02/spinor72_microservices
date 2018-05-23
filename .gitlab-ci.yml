@@ -3,33 +3,120 @@ image: ruby:2.4.2
 stages:
   - build
   - test
-  - deploy
+  - review
+  - stage
+  - production
 
 variables:
   DATABASE_URL: 'mongodb://mongo/user_posts'
+  # set appropriate values in Secret variables  settings/ci_cd
+  # GITLAB_REGISTRY: 'gitlab-host:4567'
+  # GCP_PROJECT: 'docker-spinor72'
+  # GCP_ZONE: 'europe-west4-b'
+  GCP_IMAGE: 'https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts'
 
 before_script:
+  - export
   - cd reddit
-  - bundle install
 
 build_job:
+  tags:
+    - docker
+  image: docker:latest
   stage: build
+  variables:
+    DOCKER_OPTS: "--insecure-registry=${GITLAB_REGISTRY}"
+
+  services:
+    - name: lordgaav/dind-options:latest
+      alias: docker
   script:
     - echo 'Building'
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
+    - docker build -t ${GITLAB_REGISTRY}/${CI_PROJECT_PATH}/reddit:${CI_COMMIT_REF_NAME} .
+    - docker push ${GITLAB_REGISTRY}/${CI_PROJECT_PATH}/reddit:${CI_COMMIT_REF_NAME}
 
 test_unit_job:
+  tags:
+    - docker
   stage: test
   services:
     - mongo:latest
   script:
+    - bundle install
     - ruby simpletest.rb
 
 test_integration_job:
+  tags:
+    - docker
   stage: test
   script:
     - echo 'Testing 2'
 
-deploy_job:
-  stage: deploy
+deploy_dev_job:
+  tags:
+    - docker
+  stage: review
   script:
     - echo 'Deploy'
+  environment:
+    name: dev
+    url: http://dev.example.com
+
+branch review:
+  tags:
+    - docker-machine
+  stage: review
+  script:
+    - echo "Deploy to $CI_ENVIRONMENT_SLUG"
+    - docker-machine status reddit-deploy-${CI_COMMIT_REF_NAME} > /dev/null || docker-machine create --driver google --google-disk-size 10 --google-machine-image ${GCP_IMAGE}  --google-machine-type n1-standard-1 --google-zone ${GCP_ZONE} --google-project ${GCP_PROJECT} --engine-insecure-registry ${GITLAB_REGISTRY} reddit-deploy-${CI_COMMIT_REF_NAME}
+    - eval $(docker-machine env reddit-deploy-${CI_COMMIT_REF_NAME})
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN ${GITLAB_REGISTRY}
+    - docker stop reddit || true && docker rm reddit || true
+    - docker run -d -p 9292:9292 --name reddit ${GITLAB_REGISTRY}/${CI_PROJECT_PATH}/reddit:${CI_COMMIT_REF_NAME}
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: http://$CI_ENVIRONMENT_SLUG.example.com
+    on_stop: delete_server
+  only:
+    - branches
+  except:
+    - master
+
+delete_server:
+  tags:
+    - docker-machine
+  stage: review
+  script:
+    - docker-machine rm -f reddit-deploy-${CI_COMMIT_REF_NAME}
+  when: manual
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: http://$CI_ENVIRONMENT_SLUG.example.com
+    action: stop
+  only:
+    - branches
+  except:
+    - master
+
+staging:
+  stage: stage
+  when: manual
+  only:
+    - /^\d+\.\d+.\d+/
+  script:
+    - echo 'Deploy'
+  environment:
+    name: stage
+    url: https://beta.example.com
+
+production:
+  stage: production
+  when: manual
+  only:
+    - /^\d+\.\d+.\d+/
+  script:
+    - echo 'Deploy'
+  environment:
+    name: production
+    url: https://example.com

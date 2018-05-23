@@ -1,0 +1,42 @@
+{
+  "variables": {
+    "project_id": null,
+    "source_image_family": null,
+    "machine_type": null,
+    "disk_size": "100",
+    "disk_type": "pd-standard",
+    "network": "default",
+    "zone": "europe-west4-b"
+  },
+  "builders": [
+    {
+    "image_description": "Gitlab runner machine image",
+    "type": "googlecompute",
+    "project_id": "{{user `project_id`}}",
+    "image_name": "gitlab-runner-machine-{{timestamp}}",
+    "image_family": "gitlab-runner-machine",
+    "source_image_family": "{{user `source_image_family`}}",
+    "zone": "{{user `zone`}}",
+    "ssh_username": "appuser",
+    "ssh_timeout": "35s",
+    "ssh_port": 22,
+    "machine_type": "{{user `machine_type`}}",
+    "disk_size": "{{user `disk_size`}}",
+    "disk_type": "{{user `disk_type`}}",
+    "network": "{{user `network`}}",
+	"tags": [
+      "docker-machine"
+    ],
+	"labels": {
+	  "gitlab": "runner"
+	}
+    }
+  ],
+  "provisioners": [
+    {
+    "type": "ansible",
+    "playbook_file": "ansible/playbooks/packer-gitlab-runner-machine.yml",
+    "ansible_env_vars": [ "ANSIBLE_ROLES_PATH=ansible/roles"]
+    }
+    ]
+}
