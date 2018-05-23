@@ -1,0 +1,19 @@
+project = "your-project"
+
+region = "your-region"
+
+zone = "your-region-x"
+
+public_key_path = "~/.ssh/appuser.pub"
+
+private_key_path = "~/.ssh/appuser"
+
+gitlab_runner_disk_image = "gitlab-runner-base"
+
+gitlab_runner_disk_size = 100
+
+gitlab_runner_url = "http://localhost/"
+
+gitlab_runner_registration_token = "Set Runner Token"
+
+count = 2
