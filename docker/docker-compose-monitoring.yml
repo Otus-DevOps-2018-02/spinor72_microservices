@@ -1,0 +1,79 @@
+version: '3.3'
+services:
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
+  prometheus:
+    image: ${USER_NAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      net_back:
+        aliases:
+          - prometheus
+      net_front:
+        aliases:
+          - prometheus
+      net_mon:
+        aliases:
+          - prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+
+  mongodb-exporter:
+    image: ${USER_NAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}
+    environment:
+      MONGODB_URL: mongodb://post_db
+    networks:
+      net_mon:
+        aliases:
+          - mongodb-exporter
+      net_back:
+        aliases:
+          - mongodb-exporter
+
+  cloudprober-exporter:
+    image: ${USER_NAME}/google-cloudprober:${CLOUDPROBER_VERSION}
+    networks:
+      net_mon:
+        aliases:
+          - cloudprober-exporter
+      net_front:
+        aliases:
+          - cloudprober-exporter
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      net_mon:
+        aliases:
+          - node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+volumes:
+  prometheus_data:
+
+  net_mon:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.3.0/24
