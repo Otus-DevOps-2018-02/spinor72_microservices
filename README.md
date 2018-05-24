@@ -309,7 +309,14 @@ _После проверки удалить ненужные инстансы к
  - Созданы файлы конфигурации для `docker-compose` и `Docker` для развертывания тестового приложения и его мониторинга на базе `Prometheus`
  - Проверена работа мониторинга 
  - Образы залиты в регистри 
-
+    
+     - https://hub.docker.com/r/spinor72/ui/
+     - https://hub.docker.com/r/spinor72/post/
+     - https://hub.docker.com/r/spinor72/comment/
+     - https://hub.docker.com/r/spinor72/prometheus/
+     - https://hub.docker.com/r/spinor72/percona-mongodb-exporter/
+     - https://hub.docker.com/r/spinor72/google-cloudprober/
+    
 
 Для задания со *  
  - Добавлен экспортер для MongoDB на базе проекта `Percona Mongodb exporter` https://github.com/percona/mongodb_exporter 
