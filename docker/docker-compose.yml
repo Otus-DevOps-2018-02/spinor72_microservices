@@ -1,0 +1,123 @@
+version: '3.3'
+services:
+  post_db:
+    image: mongo:${MONGO_VERSION}
+    volumes:
+      - post_db:/data/db
+    networks:
+      net_back:
+        aliases:
+          - post_db
+          - comment_db
+  ui:
+    image: ${USER_NAME}/ui:${UI_VERSION}
+    ports:
+      - ${UI_PORT}:${UI_PORT}/tcp
+    networks:
+      net_front:
+
+  post:
+    image: ${USER_NAME}/post:${POST_VERSION}
+    networks:
+      net_back:
+        aliases:
+          - post
+      net_front:
+        aliases:
+          - post
+
+  comment:
+    image: ${USER_NAME}/comment:${COMMENT_VERSION}
+    networks:
+      net_back:
+        aliases:
+          - comment
+      net_front:
+        aliases:
+          - comment
+
+  prometheus:
+    image: ${USER_NAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      net_back:
+        aliases:
+          - prometheus
+      net_front:
+        aliases:
+          - prometheus
+      net_mon:
+        aliases:
+          - prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+
+  mongodb-exporter:
+    image: ${USER_NAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}
+    environment:
+      MONGODB_URL: mongodb://post_db
+    networks:
+      net_mon:
+        aliases:
+          - mongodb-exporter
+      net_back:
+        aliases:
+          - mongodb-exporter
+
+  cloudprober-exporter:
+    image: ${USER_NAME}/google-cloudprober:${CLOUDPROBER_VERSION}
+    networks:
+      net_mon:
+        aliases:
+          - cloudprober-exporter
+      net_front:
+        aliases:
+          - cloudprober-exporter
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      net_mon:
+        aliases:
+          - node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+
+volumes:
+  post_db:
+  prometheus_data:
+
+networks:
+  net_back:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.2.0/24
+
+  net_front:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.1.0/24
+
+  net_mon:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.3.0/24
