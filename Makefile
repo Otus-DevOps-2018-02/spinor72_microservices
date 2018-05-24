@@ -3,8 +3,8 @@ include ./docker/.env
 export $(shell sed 's/=.*//' ./docker/.env)
 
 # проверка наличия переменной с именем пользователя
-ifeq ($(DOCKERHUB_USERNAME),)
-  $(error DOCKERHUB_USERNAME is not set)
+ifeq ($(USER_NAME),)
+  $(error USER_NAME is not set)
 endif
 
 # сборка образов, всех сразу или отдельно
@@ -17,11 +17,11 @@ build_comment:
 build_post:
 	cd src/post-py && bash docker_build.sh
 build_prometheus:
-	cd monitoring/prometheus && docker build -t $(DOCKERHUB_USERNAME)/prometheus .
+	cd monitoring/prometheus && docker build -t $(USER_NAME)/prometheus .
 build_mongodb_exporter:
-	cd monitoring/exporters/percona-mongodb-exporter && docker build --build-arg PERCONA_MONGODB_EXPORTER_VERSION=$(PERCONA_MONGODB_EXPORTER_VERSION) -t $(DOCKERHUB_USERNAME)/percona-mongodb-exporter:$(PERCONA_MONGODB_EXPORTER_VERSION) .
+	cd monitoring/exporters/percona-mongodb-exporter && docker build --build-arg PERCONA_MONGODB_EXPORTER_VERSION=$(PERCONA_MONGODB_EXPORTER_VERSION) -t $(USER_NAME)/percona-mongodb-exporter:$(PERCONA_MONGODB_EXPORTER_VERSION) .
 build_cloudprober:
-	cd monitoring/exporters/google-cloudprober && docker build --build-arg CLOUDPROBER_VERSION=$(CLOUDPROBER_VERSION) -t $(DOCKERHUB_USERNAME)/google-cloudprober:$(CLOUDPROBER_VERSION) .
+	cd monitoring/exporters/google-cloudprober && docker build --build-arg CLOUDPROBER_VERSION=$(CLOUDPROBER_VERSION) -t $(USER_NAME)/google-cloudprober:$(CLOUDPROBER_VERSION) .
 
 # заливка образов в репозиторий, требуется предварителньо залогиниться
 .PHONY: check_login push push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober
@@ -29,17 +29,17 @@ push: check_login push_ui push_comment push_post push_prometheus push_mongodb_ex
 check_login:
 	if grep -q 'auths": {}' ~/.docker/config.json ; then echo "Please login to Docker HUb first" && exit 1; fi
 push_ui: check_login
-	docker push $(DOCKERHUB_USERNAME)/ui
+	docker push $(USER_NAME)/ui
 push_comment: check_login
-	docker push $(DOCKERHUB_USERNAME)/comment
+	docker push $(USER_NAME)/comment
 push_post: check_login
-	docker push $(DOCKERHUB_USERNAME)/post
+	docker push $(USER_NAME)/post
 push_prometheus: check_login
-	docker push $(DOCKERHUB_USERNAME)/prometheus
+	docker push $(USER_NAME)/prometheus
 push_mongodb_exporter: check_login
-	docker push $(DOCKERHUB_USERNAME)/percona-mongodb-exporter:$(PERCONA_MONGODB_EXPORTER_VERSION)
+	docker push $(USER_NAME)/percona-mongodb-exporter:$(PERCONA_MONGODB_EXPORTER_VERSION)
 push_cloudprober: check_login
-	docker push $(DOCKERHUB_USERNAME)/google-cloudprober:$(CLOUDPROBER_VERSION)
+	docker push $(USER_NAME)/google-cloudprober:$(CLOUDPROBER_VERSION)
 
 # запуск и остановка
 .PHONY: up down  stop restart
