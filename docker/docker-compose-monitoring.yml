@@ -32,6 +32,7 @@ services:
       - '/var/lib/docker/:/var/lib/docker:ro'
     ports:
       - '8080:8080'
+    networks: [net_mon]
 
   mongodb-exporter:
     image: ${USER_NAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}

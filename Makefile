@@ -71,9 +71,13 @@ machine:
 	--google-zone europe-west4-b \
 	docker-host
 
-firewall:
-	gcloud compute firewall-rules create prometheus-default --allow tcp:9090
-	gcloud compute firewall-rules create puma-default --allow tcp:9292
+firewall: firewall_puma firewall_prom firewall_cadvisor
+firewall_puma:
+	gcloud compute firewall-rules create puma-default --allow tcp:9090
+firewall_prom:
+	gcloud compute firewall-rules create prometheus-default --allow tcp:9292
+firewall_cadvisor:
+	gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
 
 
 .PHONY: test_env clean clean_all
