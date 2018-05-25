@@ -54,6 +54,14 @@ log:
 restart:  down up
 reload: stop up
 
+# запуск и остановка мониторинга
+.PHONY: up_mon down_mon
+up_mon:
+	cd docker && docker-compose -f docker-compose-monitoring.yml up -d
+down_mon:
+	cd docker && docker-compose -f docker-compose-monitoring.yml down
+
+
 # инфраструктура
 .PHONY: machine firewall
 machine:

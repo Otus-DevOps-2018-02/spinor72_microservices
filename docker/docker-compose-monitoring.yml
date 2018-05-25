@@ -1,14 +1,7 @@
 version: '3.3'
+
 services:
-  cadvisor:
-    image: google/cadvisor:v0.29.0
-    volumes:
-      - '/:/rootfs:ro'
-      - '/var/run:/var/run:rw'
-      - '/sys:/sys:ro'
-      - '/var/lib/docker/:/var/lib/docker:ro'
-    ports:
-      - '8080:8080'
+
   prometheus:
     image: ${USER_NAME}/prometheus
     ports:
@@ -29,6 +22,16 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention=1d'
+
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
 
   mongodb-exporter:
     image: ${USER_NAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}
@@ -68,8 +71,12 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
 
+
 volumes:
   prometheus_data:
+
+
+networks:
 
   net_mon:
     driver: bridge
@@ -77,3 +84,17 @@ volumes:
       driver: default
       config:
       - subnet: 10.0.3.0/24
+
+  net_back:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.2.0/24
+
+  net_front:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.1.0/24
