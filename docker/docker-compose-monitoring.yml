@@ -88,6 +88,19 @@ services:
     ports:
       - 3000:3000
 
+  alertmanager:
+    image: ${USER_NAME}/alertmanager:${ALERTMANAGER_VERSION}
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+    environment:
+      - SLACK_API_URL=${SLACK_API_URL}
+      - SLACK_CHANNEL=${SLACK_CHANNEL}
+    networks:
+      net_mon:
+        aliases:
+          - alertmanager
+    ports:
+      - 9093:9093
 
 volumes:
   prometheus_data:
@@ -103,15 +116,9 @@ networks:
       - subnet: 10.0.3.0/24
 
   net_back:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-      - subnet: 10.0.2.0/24
+    external:
+      name: reddit_net_back
 
   net_front:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-      - subnet: 10.0.1.0/24
+    external:
+      name: reddit_net_front
