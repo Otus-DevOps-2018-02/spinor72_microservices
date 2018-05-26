@@ -53,3 +53,8 @@ scrape_configs:
     static_configs:
       - targets:
         - 'cadvisor:8080'
+
+  - job_name: 'docker-host'
+    static_configs:
+      - targets:
+        - '10.0.3.1:9323'

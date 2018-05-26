@@ -67,13 +67,22 @@ down_mon:
 
 
 # инфраструктура
-.PHONY: machine firewall
+.PHONY: machine firewall docker_opt
 machine:
 	docker-machine create --driver google --google-disk-size 20 \
 	--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
 	--google-machine-type n1-standard-1 \
 	--google-zone europe-west4-b \
+	--engine-opt experimental=true \
+	--engine-opt metrics-addr=0.0.0.0:9323 \
 	docker-host
+
+docker_opt:
+	docker-machine create -d google \
+	--engine-opt experimental=true \
+	--engine-opt metrics-addr=0.0.0.0:9323 \
+	docker-host
+
 
 firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana
 firewall_puma:
@@ -85,7 +94,9 @@ firewall_cadvisor:
 firewall_grafana:
 	gcloud compute firewall-rules create grafana-default --allow tcp:3000
 firewall_alertmanager:
-	gcloud compute firewall-rules create grafana-default --allow tcp:9093
+	gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
+firewall_docker_metrics:
+	gcloud compute firewall-rules create docker-metrics-default --allow tcp:9323
 
 .PHONY: test_env clean clean_all
 test_env:
@@ -101,7 +112,7 @@ clean_all:
 
 alert:
 	curl -X POST -H 'Content-type: application/json' \
-	--data '{"text":"Checking send alert to slack.\n Username: $(USER_NAME)"}' \
+	--data '{"text":"Checking send alert to slack.\n Username: $(USER_NAME)  Channel: $(SLACK_CHANNEL)"}' \
  	$(SLACK_API_URL)
 
 config:
