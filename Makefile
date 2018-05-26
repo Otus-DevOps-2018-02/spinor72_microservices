@@ -64,6 +64,8 @@ up_mon:
 	cd docker && docker-compose -f docker-compose-monitoring.yml up -d
 down_mon:
 	cd docker && docker-compose -f docker-compose-monitoring.yml down
+log_mon:
+	cd docker && docker-compose logs --follow -f docker-compose-monitoring.yml
 
 
 # инфраструктура

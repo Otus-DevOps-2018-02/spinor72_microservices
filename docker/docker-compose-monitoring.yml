@@ -95,6 +95,10 @@ services:
     environment:
       - SLACK_API_URL=${SLACK_API_URL}
       - SLACK_CHANNEL=${SLACK_CHANNEL}
+      - SMTP_HOSTNAME=${SMTP_HOSTNAME}
+      - SMTP_LOGIN=${SMTP_LOGIN}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_RECIPIENT=${SMTP_RECIPIENT}
     networks:
       net_mon:
         aliases:
