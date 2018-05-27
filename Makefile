@@ -69,11 +69,11 @@ up_mon:
 down_mon:
 	cd docker && docker-compose -f docker-compose-monitoring.yml down
 log_mon:
-	cd docker && docker-compose logs --follow -f docker-compose-monitoring.yml
+	cd docker && docker-compose -f docker-compose-monitoring.yml logs --follow 
 
 
 # инфраструктура
-.PHONY: machine firewall docker_opt
+.PHONY: machine firewall
 machine:
 	docker-machine create \
 	--driver google \
@@ -97,14 +97,8 @@ machine:
 	docker-machine ssh docker-host gcloud auth list
 	docker-machine ip docker-host
 
-docker_opt:
-	docker-machine create -d google \
-	--engine-opt experimental=true \
-	--engine-opt metrics-addr=0.0.0.0:9323 \
-	docker-host
 
-
-firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager 
+firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver
 firewall_puma:
 	gcloud compute firewall-rules create puma-default --allow tcp:9090
 firewall_prom:
@@ -131,7 +125,7 @@ clean:
 clean_all:
 	docker system prune --all --volumes
 
-
+# проверка алерат в слак
 alert:
 	curl -X POST -H 'Content-type: application/json' \
 	--data '{"text":"Checking send alert to slack.\n Username: $(USER_NAME)  Channel: $(SLACK_CHANNEL)"}' \
