@@ -106,6 +106,21 @@ services:
     ports:
       - 9093:9093
 
+  stackdriver:
+    image: frodenas/stackdriver-exporter
+    environment:
+      - STACKDRIVER_EXPORTER_GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID}
+      - STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=${STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES}
+    volumes:
+      - '~/.config/gcloud:/root/.config/gcloud'
+
+    networks:
+      net_mon:
+        aliases:
+          - stackdriver
+    ports:
+      - 9255:9255
+
 volumes:
   prometheus_data:
   grafana_data:

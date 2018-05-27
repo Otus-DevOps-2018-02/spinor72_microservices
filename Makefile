@@ -75,13 +75,27 @@ log_mon:
 # инфраструктура
 .PHONY: machine firewall docker_opt
 machine:
-	docker-machine create --driver google --google-disk-size 20 \
+	docker-machine create \
+	--driver google \
+	--google-project $(GOOGLE_PROJECT_ID) \
+	--google-disk-size 20 \
 	--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
 	--google-machine-type n1-standard-1 \
 	--google-zone europe-west4-b \
+	--google-scopes=\
+	https://www.googleapis.com/auth/devstorage.read_only,\
+	https://www.googleapis.com/auth/monitoring,\
+	https://www.googleapis.com/auth/logging.write,\
+	https://www.googleapis.com/auth/monitoring.write,\
+	https://www.googleapis.com/auth/pubsub,\
+	https://www.googleapis.com/auth/service.management.readonly,\
+	https://www.googleapis.com/auth/servicecontrol,\
+	https://www.googleapis.com/auth/trace.append \
 	--engine-opt experimental=true \
 	--engine-opt metrics-addr=0.0.0.0:9323 \
 	docker-host
+	docker-machine ssh docker-host gcloud auth list
+	docker-machine ip docker-host
 
 docker_opt:
 	docker-machine create -d google \
@@ -90,7 +104,7 @@ docker_opt:
 	docker-host
 
 
-firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana
+firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager 
 firewall_puma:
 	gcloud compute firewall-rules create puma-default --allow tcp:9090
 firewall_prom:
@@ -103,6 +117,8 @@ firewall_alertmanager:
 	gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
 firewall_docker_metrics:
 	gcloud compute firewall-rules create docker-metrics-default --allow tcp:9323
+firewall_stackdriver:
+	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
 
 .PHONY: test_env clean clean_all
 test_env:
@@ -120,6 +136,3 @@ alert:
 	curl -X POST -H 'Content-type: application/json' \
 	--data '{"text":"Checking send alert to slack.\n Username: $(USER_NAME)  Channel: $(SLACK_CHANNEL)"}' \
  	$(SLACK_API_URL)
-
-config:
-	~/proj/go/frep --overwrite ./monitoring/alertmanager/config.yml.in

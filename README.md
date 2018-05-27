@@ -368,3 +368,21 @@ _Предполагается, что настроен доступ к прое�
 
  - [ ] Основное ДЗ
  - [ ] Задание со *
+
+
+Реализован сбор метрик со Stackdriver, 
+воспользовался проектом https://github.com/frodenas/stackdriver_exporter
+Запускается в контейнере
+Какеи метрики собирать, нужно задать в переменной среды `STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES`
+Описание подходящих префиксов, можно посомотреть на страничке https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
+
+`STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=compute.googleapis.com/instance/cpu,compute.googleapis.com/instance/disk,compute.googleapis.com/instance/network`
+
+Например, если задать `STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=compute.googleapis.com/instance/cpu,compute.googleapis.com/instance/disk,compute.googleapis.com/instance/network` ,то будут доступны такие метрики как
+Для CPU
+stackdriver_gce_instance_compute_googleapis_com_instance_cpu_utilization и т д
+Для диска
+stackdriver_gce_instance_compute_googleapis_com_instance_disk_read_bytes_count и т д
+Для сети
+stackdriver_gce_instance_compute_googleapis_com_instance_network_received_bytes_count и т д
+
