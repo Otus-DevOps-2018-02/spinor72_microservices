@@ -2,7 +2,7 @@
 #!/bin/sh
 
 # make conf file form template and env vars
-awk '{while(match($0,"[$]{[^}]*}")) {var=substr($0,RSTART+2,RLENGTH -3);gsub("[$]{"var"}",ENVIRON[var])}}1' \
+[[ -z "${SLACK_API_URL}" ]] || awk '{while(match($0,"[$]{[^}]*}")) {var=substr($0,RSTART+2,RLENGTH -3);gsub("[$]{"var"}",ENVIRON[var])}}1' \
      < /etc/alertmanager/config.yml.in \
      > /etc/alertmanager/config.yml
 
