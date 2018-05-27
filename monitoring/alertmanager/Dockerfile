@@ -4,5 +4,6 @@ FROM prom/alertmanager:${ALERTMANAGER_VERSION}
 ADD entrypoint.sh /bin/entrypoint
 RUN chmod +x /bin/entrypoint
 ADD config.yml.in /etc/alertmanager/
+ADD config.yml /etc/alertmanager/
 
 ENTRYPOINT /bin/entrypoint
