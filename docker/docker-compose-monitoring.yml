@@ -73,7 +73,7 @@ services:
       - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
 
   grafana:
-    image: grafana/grafana:5.0.0
+    image: ${USER_NAME}/grafana:${GRAFANA_VERSION}
     volumes:
       - grafana_data:/var/lib/grafana
     environment:

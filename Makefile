@@ -8,8 +8,8 @@ ifeq ($(USER_NAME),)
 endif
 
 # сборка образов, всех сразу или отдельно
-.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager
-build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager
+.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana
+build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana
 build_ui:
 	cd src/ui && bash docker_build.sh
 build_comment:
@@ -24,10 +24,12 @@ build_cloudprober:
 	cd monitoring/exporters/google-cloudprober && docker build --build-arg CLOUDPROBER_VERSION=$(CLOUDPROBER_VERSION) -t $(USER_NAME)/google-cloudprober:$(CLOUDPROBER_VERSION) .
 build_alertmanager:
 	cd monitoring/alertmanager && docker build --build-arg ALERTMANAGER_VERSION=$(ALERTMANAGER_VERSION) -t $(USER_NAME)/alertmanager:$(ALERTMANAGER_VERSION) .
+build_grafana:
+	cd monitoring/grafana && docker build --build-arg GRAFANA_VERSION=$(GRAFANA_VERSION) -t $(USER_NAME)/grafana:$(GRAFANA_VERSION) .
 
 # заливка образов в репозиторий, требуется предварителньо залогиниться
-.PHONY: check_login push push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober push_alertmanager
-push: check_login push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober push_alertmanager
+.PHONY: check_login push push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober push_alertmanager push_grafana
+push: check_login push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober push_alertmanager push_grafana
 check_login:
 	if grep -q 'auths": {}' ~/.docker/config.json ; then echo "Please login to Docker HUb first" && exit 1; fi
 push_ui: check_login
@@ -44,6 +46,8 @@ push_cloudprober: check_login
 	docker push $(USER_NAME)/google-cloudprober:$(CLOUDPROBER_VERSION)
 push_alertmanager: check_login
 	docker push $(USER_NAME)/alertmanager:$(ALERTMANAGER_VERSION)
+push_grafana: check_login
+	docker push $(USER_NAME)/grafana:$(GRAFANA_VERSION)
 
 # запуск и остановка
 .PHONY: up down  stop restart

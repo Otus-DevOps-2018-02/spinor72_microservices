@@ -1,34 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS_SERVER",
-      "label": "Prometheus Server",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "5.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "graph",
-      "name": "Graph",
-      "version": "5.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "5.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -45,7 +15,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": null,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -53,7 +23,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_SERVER}",
+      "datasource": "prometheus",
       "description": "HTTP response time 95th percentile for UI",
       "fill": 1,
       "gridPos": {
@@ -86,6 +56,7 @@
       "steppedLine": false,
       "targets": [
         {
+          "$$hashKey": "object:172",
           "expr": "histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m])) by (le))",
           "format": "time_series",
           "intervalFactor": 1,
@@ -126,14 +97,18 @@
           "min": null,
           "show": true
         }
-      ]
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_SERVER}",
+      "datasource": "prometheus",
       "description": "Rate of UI HTTP Requests with Error",
       "fill": 1,
       "gridPos": {
@@ -166,6 +141,7 @@
       "steppedLine": false,
       "targets": [
         {
+          "$$hashKey": "object:226",
           "expr": "rate(ui_request_count{http_status=~\"^[45].*\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
@@ -206,14 +182,18 @@
           "min": null,
           "show": true
         }
-      ]
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_SERVER}",
+      "datasource": "prometheus",
       "description": "All HTTP requests that UI service recaived",
       "fill": 1,
       "gridPos": {
@@ -246,6 +226,7 @@
       "steppedLine": false,
       "targets": [
         {
+          "$$hashKey": "object:280",
           "expr": "rate(ui_request_count[1m])",
           "format": "time_series",
           "intervalFactor": 1,
@@ -286,7 +267,11 @@
           "min": null,
           "show": true
         }
-      ]
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     }
   ],
   "refresh": "5s",
@@ -328,5 +313,5 @@
   "timezone": "",
   "title": "UI_Service_Monitoring",
   "uid": "2Y09dh4mz",
-  "version": 4
+  "version": 1
 }

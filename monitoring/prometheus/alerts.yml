@@ -16,5 +16,5 @@ groups:
       labels:
         severity: page
       annotations:
-        description: '{{ $labels.instance }} of job {{ $labels.job }} UI 95th percentile grows for more than 1 minute'
-        summary: 'UI 95th percentile {{ $labels.instance }} grows'
+        description: '{{ $labels.instance }} of job {{ $labels.job }} UI 95th percentile high for more than 1 minute'
+        summary: 'UI 95th percentile {{ $labels.instance }} is over 0.06'
