@@ -10,6 +10,10 @@ route:
   receiver: 'email-notifications'
   routes:
     - match:
+        alertname: InstanceDown
+      repeat_interval: 5m
+      receiver: autoheal 
+    - match:
         severity: page
       continue: true
       receiver: 'slack-notifications'
@@ -26,3 +30,7 @@ receivers:
     email_configs:
       - to: "${SMTP_RECIPIENT}"
         from: "Alertmanager <${SMTP_LOGIN}>"
+
+  - name: 'autoheal'
+    webhook_configs:
+    - url: http://autoheal:9099/alerts

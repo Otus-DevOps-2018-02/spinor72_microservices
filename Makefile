@@ -26,6 +26,9 @@ build_alertmanager:
 	cd monitoring/alertmanager && docker build --build-arg ALERTMANAGER_VERSION=$(ALERTMANAGER_VERSION) -t $(USER_NAME)/alertmanager:$(ALERTMANAGER_VERSION) .
 build_grafana:
 	cd monitoring/grafana && docker build --build-arg GRAFANA_VERSION=$(GRAFANA_VERSION) -t $(USER_NAME)/grafana:$(GRAFANA_VERSION) .
+build_autoheal:
+	cd monitoring/autoheal && docker build  -t $(USER_NAME)/autoheal:latest .
+
 
 # заливка образов в репозиторий, требуется предварителньо залогиниться
 .PHONY: check_login push push_ui push_comment push_post push_prometheus push_mongodb_exporter push_cloudprober push_alertmanager push_grafana
@@ -57,6 +60,8 @@ down:
 	cd docker && docker-compose down
 stop:
 	cd docker && docker-compose stop
+stop_post:
+	cd docker && docker-compose stop post
 log:
 	cd docker && docker-compose logs --follow
 restart:  down up
@@ -70,6 +75,14 @@ down_mon:
 	cd docker && docker-compose -f docker-compose-monitoring.yml down
 log_mon:
 	cd docker && docker-compose -f docker-compose-monitoring.yml logs --follow 
+
+.PHONY: up_ah down_ah
+up_ah:
+	cd monitoring/autoheal && docker-compose up -d
+down_ah:
+	cd monitoring/autoheal && docker-compose down
+log_ah:
+	cd monitoring/autoheal && docker-compose logs --follow 
 
 
 # инфраструктура
@@ -113,6 +126,8 @@ firewall_docker_metrics:
 	gcloud compute firewall-rules create docker-metrics-default --allow tcp:9323
 firewall_stackdriver:
 	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
+firewall_autoheal:
+	gcloud compute firewall-rules create autoheal-default --allow tcp:9099
 
 .PHONY: test_env clean clean_all
 test_env:

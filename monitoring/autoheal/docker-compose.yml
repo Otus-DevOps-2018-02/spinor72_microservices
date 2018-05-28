@@ -1,0 +1,98 @@
+version: '3'
+services:
+  postgres:
+    image: "postgres:9.6"
+    environment:
+      POSTGRES_USER: awx
+      POSTGRES_PASSWORD: awxpass1qaz2wsx
+      POSTGRES_DB: awx
+    networks:
+      net_mon:
+        aliases:
+          - postgres
+  rabbitmq:
+    image: "rabbitmq:3"
+    environment:
+      RABBITMQ_DEFAULT_VHOST: awx
+    networks:
+      net_mon:
+        aliases:
+          - rabbitmq
+
+  memcached:
+    image: "memcached:alpine"
+    networks:
+      net_mon:
+        aliases:
+          - memcached
+
+  awx_web:
+    # image: "geerlingguy/awx_web:latest"
+    image: "ansible/awx_web:latest"
+    links:
+      - rabbitmq
+      - memcached
+      - postgres
+    ports:
+      - "80:8052"
+    hostname: awxweb
+    user: root
+    environment:
+      SECRET_KEY: aabbcc1qaz2wsx
+      DATABASE_USER: awx
+      DATABASE_PASSWORD: awxpass1qaz2wsx
+      DATABASE_NAME: awx
+      DATABASE_PORT: 5432
+      DATABASE_HOST: postgres
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: awx
+      MEMCACHED_HOST: memcached
+      MEMCACHED_PORT: 11211
+    networks:
+      net_mon:
+        aliases:
+          - awxweb
+
+  awx_task:
+    # image: "geerlingguy/awx_task:latest"
+    image: "ansible/awx_task:latest"
+    links:
+      - rabbitmq
+      - memcached
+      - awx_web:awxweb
+      - postgres
+    hostname: awx
+    user: root
+    environment:
+      SECRET_KEY: aabbcc1qaz2wsx
+      DATABASE_USER: awx
+      DATABASE_PASSWORD: awxpass1qaz2wsx
+      DATABASE_NAME: awx
+      DATABASE_PORT: 5432
+      DATABASE_HOST: postgres
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_VHOST: awx
+      MEMCACHED_HOST: memcached
+      MEMCACHED_PORT: 11211
+    networks:
+      net_mon:
+        aliases:
+          - awx
+  autoheal:
+    image: "spinor72/autoheal:latest"
+    networks:
+      net_mon:
+        aliases:
+          - autoheal
+
+networks:
+  net_mon:
+    external:
+      name: reddit_net_mon
+
