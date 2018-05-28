@@ -12,7 +12,8 @@ route:
     - match:
         alertname: InstanceDown
       repeat_interval: 5m
-      receiver: autoheal 
+      receiver: autoheal
+      continue: true 
     - match:
         severity: page
       continue: true

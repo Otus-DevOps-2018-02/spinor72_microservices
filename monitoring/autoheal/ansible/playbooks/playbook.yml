@@ -7,6 +7,6 @@
   tasks:
     - name: Restart a container
       docker_container:
-        name: "{{ node }}"
+        name: "reddit_{{ alert.labels.job }}_1"
         state: started
         restart: yes

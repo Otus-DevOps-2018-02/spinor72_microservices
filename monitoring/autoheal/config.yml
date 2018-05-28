@@ -24,13 +24,13 @@ awx:
   project: "Autoheal"
 
 throttling:
-  interval: 5s
+  interval: 15s
 
 rules:
 - metadata:
     name: start-node
   labels:
-    alertname: "NodeDown"
+    alertname: "InstanceDown"
   awxJob:
     template: "Start node"
     extraVars:
