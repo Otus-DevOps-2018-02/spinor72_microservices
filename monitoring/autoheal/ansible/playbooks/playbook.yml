@@ -8,6 +8,5 @@
     - name: Restart a container
       docker_container:
         name: "{{ node }}"
-        # image: someuser/appimage
         state: started
         restart: yes

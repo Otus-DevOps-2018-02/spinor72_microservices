@@ -8,8 +8,8 @@ ifeq ($(USER_NAME),)
 endif
 
 # сборка образов, всех сразу или отдельно
-.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana
-build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana
+.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
+build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
 build_ui:
 	cd src/ui && bash docker_build.sh
 build_comment:
@@ -51,6 +51,8 @@ push_alertmanager: check_login
 	docker push $(USER_NAME)/alertmanager:$(ALERTMANAGER_VERSION)
 push_grafana: check_login
 	docker push $(USER_NAME)/grafana:$(GRAFANA_VERSION)
+push_autoheal: check_login
+	docker push $(USER_NAME)/autoheal:latest
 
 # запуск и остановка
 .PHONY: up down  stop restart
@@ -126,8 +128,8 @@ firewall_docker_metrics:
 	gcloud compute firewall-rules create docker-metrics-default --allow tcp:9323
 firewall_stackdriver:
 	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
-firewall_autoheal:
-	gcloud compute firewall-rules create autoheal-default --allow tcp:9099
+firewall_awx:
+	gcloud compute firewall-rules create awx-default --allow tcp:8052
 
 .PHONY: test_env clean clean_all
 test_env:
