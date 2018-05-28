@@ -1,12 +1,9 @@
 ---
-- name: Start node
+- name: Start container
   hosts: all
   become: true
   gather_facts: False
 
   tasks:
-    - name: Restart a container
-      docker_container:
-        name: "reddit_{{ alert.labels.job }}_1"
-        state: started
-        restart: yes
+    - name: Start a container
+      command: docker start reddit_{{ alert.labels.job }}_1"
