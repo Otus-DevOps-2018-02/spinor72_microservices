@@ -6,4 +6,4 @@
 
   tasks:
     - name: Start a container
-      command: docker start reddit_{{ alert.labels.job }}_1"
+      command: docker start reddit_{{ alert.labels.job }}_1
