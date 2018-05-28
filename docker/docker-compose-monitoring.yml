@@ -107,7 +107,7 @@ services:
       - 9093:9093
 
   stackdriver:
-    image: frodenas/stackdriver-exporter
+    image: frodenas/stackdriver-exporter:${STACKDRIVER_EXPORTER_VERSION}
     environment:
       - STACKDRIVER_EXPORTER_GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID}
       - STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=${STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES}
