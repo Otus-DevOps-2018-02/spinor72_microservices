@@ -148,6 +148,8 @@ alert:
 	--data '{"text":"Checking send alert to slack.\n Username: $(USER_NAME)  Channel: $(SLACK_CHANNEL)"}' \
  	$(SLACK_API_URL)
 
+# заполнение AWX данными для работы autoheal. Требуется настройка tower-cli
 .PHONY: populate_awx
 populate_awx:
+	echo "host=$(TOWER_HOST) username=$(TOWER_USERNAME) password=$(TOWER_PASSWORD)" > monitoring/autoheal/ansible/playbooks/tower_cli.cfg
 	ansible-playbook -i "localhost," -c local monitoring/autoheal/ansible/playbooks/awx-autoheal.yml

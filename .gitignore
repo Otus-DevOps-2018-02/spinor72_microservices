@@ -25,3 +25,4 @@ vault.key
 .env
 docker-compose.override.yml
 build_info.txt
+tower_cli.cfg

@@ -9,7 +9,7 @@
         name: "Autoheal"
         description: "Autoheal organization"
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Add credential
       tower_credential:
@@ -18,7 +18,7 @@
         description: git account
         organization: Autoheal
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
 
     - name: Add project for autoheal
@@ -32,7 +32,7 @@
         scm_update_on_launch: yes
         scm_url: https://github.com/Otus-DevOps-2018-02/spinor72_microservices
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Add autoheal user
       tower_user:
@@ -42,7 +42,7 @@
         first_name: Autoheal
         last_name: Openshift
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Add autoheal inventory
       tower_inventory:
@@ -50,7 +50,7 @@
         description: "Docker-machine hosts"
         organization: "Autoheal"
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Add host to autoheal
       tower_host:
@@ -60,7 +60,7 @@
         variables:
           ansible_host: 10.0.3.1
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Add credential
       tower_credential:
@@ -73,7 +73,7 @@
         username: docker-user
         ssh_key_data: "{{ lookup('env', 'DOCKER_CERT_PATH') }}/id_rsa"
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Create Start node job template for autoheal jobs
       tower_job_template:
@@ -85,12 +85,12 @@
         playbook: monitoring/autoheal/ansible/playbooks/playbook.yml
         machine_credential: docker-user
         state: present
-        tower_config_file: "~/tower_cli.cfg"
+        tower_config_file: "tower_cli.cfg"
 
     - name: Grant autoheal user execute job
       command: tower-cli  role grant --user autoheal --type execute --job-template "Start node"
-      # не работает через роль 
-      # https://github.com/ansible/ansible/issues/39745 
+      # не работает через роль
+      # https://github.com/ansible/ansible/issues/39745
       # tower_role:
       #   user: autoheal
       #   job_template: "Start node"
