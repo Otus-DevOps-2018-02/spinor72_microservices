@@ -1,7 +1,6 @@
 ---
 - name: Configure AWX for autoheal
   hosts: all
-  # become: true
   gather_facts: False
 
   tasks:
@@ -16,11 +15,8 @@
       tower_credential:
         name: gituser
         kind: scm
-        # become_method: sudo
-        description: ssh key to acces docker-host
+        description: git account
         organization: Autoheal
-        # project: Autoheal
-        # ssh_key_data: ~/.ssh/appuser
         state: present
         tower_config_file: "~/tower_cli.cfg"
 
@@ -68,13 +64,14 @@
 
     - name: Add credential
       tower_credential:
-        name: appuser
+        name: docker-user
         kind: ssh
         become_method: sudo
         description: ssh key to acces docker-host
         organization: Autoheal
         # project: Autoheal
-        ssh_key_data: ~/.ssh/appuser
+        username: docker-user
+        ssh_key_data: "{{ lookup('env', 'DOCKER_CERT_PATH') }}/id_rsa"
         state: present
         tower_config_file: "~/tower_cli.cfg"
 
@@ -84,7 +81,19 @@
         job_type: run
         inventory: docker-machine
         project: Autoheal
+        ask_extra_vars: yes
         playbook: monitoring/autoheal/ansible/playbooks/playbook.yml
-        machine_credential: appuser
+        machine_credential: docker-user
         state: present
         tower_config_file: "~/tower_cli.cfg"
+
+    - name: Grant autoheal user execute job
+      command: tower-cli  role grant --user autoheal --type execute --job-template "Start node"
+      # не работает через роль 
+      # https://github.com/ansible/ansible/issues/39745 
+      # tower_role:
+      #   user: autoheal
+      #   job_template: "Start node"
+      #   role: execute
+      #   state: present
+      # tower_config_file: "~/tower_cli.cfg"
