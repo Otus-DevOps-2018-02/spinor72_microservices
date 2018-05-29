@@ -4,7 +4,7 @@ services:
     image: "postgres:9.6"
     environment:
       POSTGRES_USER: awx
-      POSTGRES_PASSWORD: awxpass1qaz2wsx
+      POSTGRES_PASSWORD: ${AWX_POSTGRES_PASSWORD}
       POSTGRES_DB: awx
     networks:
       net_mon:
@@ -38,9 +38,9 @@ services:
     hostname: awxweb
     user: root
     environment:
-      SECRET_KEY: aabbcc1qaz2wsx
+      SECRET_KEY: ${AWX_SECRET_KEY}
       DATABASE_USER: awx
-      DATABASE_PASSWORD: awxpass1qaz2wsx
+      DATABASE_PASSWORD: ${AWX_POSTGRES_PASSWORD}
       DATABASE_NAME: awx
       DATABASE_PORT: 5432
       DATABASE_HOST: postgres
@@ -67,9 +67,9 @@ services:
     hostname: awx
     user: root
     environment:
-      SECRET_KEY: aabbcc1qaz2wsx
+      SECRET_KEY: ${AWX_SECRET_KEY}
       DATABASE_USER: awx
-      DATABASE_PASSWORD: awxpass1qaz2wsx
+      DATABASE_PASSWORD: ${AWX_POSTGRES_PASSWORD}
       DATABASE_NAME: awx
       DATABASE_PORT: 5432
       DATABASE_HOST: postgres
@@ -86,6 +86,11 @@ services:
           - awx
   autoheal:
     image: "spinor72/autoheal:latest"
+    environment:
+      - AUTOHEAL_AWX_USER=${AUTOHEAL_AWX_USER}
+      - AUTOHEAL_AWX_PASSWORD=${AUTOHEAL_AWX_PASSWORD}
+      - AUTOHEAL_AWX_PROJECT=${AUTOHEAL_AWX_PROJECT}
+      - AUTOHEAL_AWX_URL_API=${AUTOHEAL_AWX_URL_API}
     networks:
       net_mon:
         aliases:

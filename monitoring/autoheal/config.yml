@@ -15,13 +15,13 @@
 #
 
 awx:
-  address: http://awxweb:8052/api
+  address: ${AUTOHEAL_AWX_URL_API}
 
   credentials:
-    username: autoheal
-    password: autoheal1qaz2wsx
+    username: ${AUTOHEAL_AWX_USER}
+    password: ${AUTOHEAL_AWX_PASSWORD}
   # insecure: false
-  project: "Autoheal"
+  project: "${AUTOHEAL_AWX_PROJECT}"
 
 throttling:
   interval: 15s

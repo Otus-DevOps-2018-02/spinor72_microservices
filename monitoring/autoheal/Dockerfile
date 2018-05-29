@@ -1,5 +1,4 @@
-FROM golang:1.9.6-stretch
-# as builder
+FROM golang:1.9.6-stretch  as builder
 
 ARG AUTOHEAL_VERSION='openshift-enterprise-autoheal-3.10.0-0.53.0'
 
@@ -9,14 +8,16 @@ WORKDIR /go/src/github.com/openshift
 RUN git clone -b $AUTOHEAL_VERSION https://github.com/openshift/autoheal.git
 WORKDIR /go/src/github.com/openshift/autoheal
 RUN make build 
-RUN cp _output/local/bin/linux/amd64/autoheal /bin
-ADD config.yml /etc/autoheal/autoheal.yml
-# FROM       alpine:3.2
 
-# чтобы запустился подсунем пустой фалйл
-RUN cd /root && mkdir .kube && cd .kube && touch config
+FROM debian:stretch-slim
+
+COPY --from=builder /go/src/github.com/openshift/autoheal/_output/local/bin/linux/amd64/autoheal /bin/autoheal
+ADD entrypoint.sh /bin/entrypoint
+RUN chmod +x /bin/entrypoint && cd /root && mkdir .kube && cd .kube && touch config
+
+ADD config.yml /etc/autoheal/config.yml.in
 WORKDIR  /etc/autoheal
 
 EXPOSE 9099
 
-CMD [ "/bin/autoheal", "server", "--master", "localhost", "--logtostderr", "--config-file=/etc/autoheal/autoheal.yml" ]
+ENTRYPOINT /bin/entrypoint
