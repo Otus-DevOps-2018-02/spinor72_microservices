@@ -1,0 +1,90 @@
+---
+- name: Configure AWX for autoheal
+  hosts: all
+  # become: true
+  gather_facts: False
+
+  tasks:
+    - name: Create organization for autoheal
+      tower_organization:
+        name: "Autoheal"
+        description: "Autoheal organization"
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Add credential
+      tower_credential:
+        name: gituser
+        kind: scm
+        # become_method: sudo
+        description: ssh key to acces docker-host
+        organization: Autoheal
+        # project: Autoheal
+        # ssh_key_data: ~/.ssh/appuser
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+
+    - name: Add project for autoheal
+      tower_project:
+        name: "Autoheal"
+        description: "Autoheal project"
+        organization: "Autoheal"
+        scm_branch: monitoring-2
+        scm_type: git
+        scm_credential: gituser
+        scm_update_on_launch: yes
+        scm_url: https://github.com/Otus-DevOps-2018-02/spinor72_microservices
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Add autoheal user
+      tower_user:
+        username: autoheal
+        password: autoheal1qaz2wsx
+        email: autoheal@example.org
+        first_name: Autoheal
+        last_name: Openshift
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Add autoheal inventory
+      tower_inventory:
+        name: "docker-machine"
+        description: "Docker-machine hosts"
+        organization: "Autoheal"
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Add host to autoheal
+      tower_host:
+        name: docker-host
+        description: "Local Host Group"
+        inventory: "docker-machine"
+        variables:
+          ansible_host: 10.0.3.1
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Add credential
+      tower_credential:
+        name: appuser
+        kind: ssh
+        become_method: sudo
+        description: ssh key to acces docker-host
+        organization: Autoheal
+        # project: Autoheal
+        ssh_key_data: ~/.ssh/appuser
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
+
+    - name: Create Start node job template for autoheal jobs
+      tower_job_template:
+        name: "Start node"
+        job_type: run
+        inventory: docker-machine
+        project: Autoheal
+        playbook: monitoring/autoheal/ansible/playbooks/playbook.yml
+        machine_credential: appuser
+        state: present
+        tower_config_file: "~/tower_cli.cfg"
