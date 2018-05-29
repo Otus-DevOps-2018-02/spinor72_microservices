@@ -2,6 +2,8 @@ version: '3'
 services:
   postgres:
     image: "postgres:9.6"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: awx
       POSTGRES_PASSWORD: ${AWX_POSTGRES_PASSWORD}
@@ -95,6 +97,8 @@ services:
       net_mon:
         aliases:
           - autoheal
+volumes:
+  pg_data:
 
 networks:
   net_mon:
