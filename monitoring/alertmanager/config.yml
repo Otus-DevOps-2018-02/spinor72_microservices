@@ -1,0 +1,29 @@
+# Файл сгенерируется из шаблона в после запуска контейнера
+global:
+  slack_api_url: 'https://hooks.slack.com/services/000000000000000000000000000000000000'
+
+  smtp_smarthost: "smtp.gmail.com:587"
+  smtp_auth_username: "login@gmail.com"
+  smtp_auth_password: "secretpassword"
+  smtp_require_tls: yes
+
+route:
+  receiver: 'email-notifications'
+  routes:
+    - match:
+        severity: page
+      continue: true
+      receiver: 'slack-notifications'
+    - match:
+        severity: page
+      receiver: 'email-notifications'
+
+receivers:
+  - name: 'slack-notifications'
+    slack_configs:
+      - channel: '#ssssssssssss'
+
+  - name: 'email-notifications'
+    email_configs:
+      - to: "login@gmail.com"
+        from: "Alertmanager <login@gmail.com>"

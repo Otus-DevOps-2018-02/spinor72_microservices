@@ -1,0 +1,143 @@
+version: '3.3'
+
+services:
+
+  prometheus:
+    image: ${USER_NAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      net_back:
+        aliases:
+          - prometheus
+      net_front:
+        aliases:
+          - prometheus
+      net_mon:
+        aliases:
+          - prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
+    networks: [net_mon]
+
+  mongodb-exporter:
+    image: ${USER_NAME}/percona-mongodb-exporter:${PERCONA_MONGODB_EXPORTER_VERSION}
+    environment:
+      MONGODB_URL: mongodb://post_db
+    networks:
+      net_mon:
+        aliases:
+          - mongodb-exporter
+      net_back:
+        aliases:
+          - mongodb-exporter
+
+  cloudprober-exporter:
+    image: ${USER_NAME}/google-cloudprober:${CLOUDPROBER_VERSION}
+    networks:
+      net_mon:
+        aliases:
+          - cloudprober-exporter
+      net_front:
+        aliases:
+          - cloudprober-exporter
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      net_mon:
+        aliases:
+          - node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+  grafana:
+    image: ${USER_NAME}/grafana:${GRAFANA_VERSION}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+    depends_on:
+      - prometheus
+    networks:
+      net_mon:
+        aliases:
+          - grafana
+    ports:
+      - 3000:3000
+
+  alertmanager:
+    image: ${USER_NAME}/alertmanager:${ALERTMANAGER_VERSION}
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+    environment:
+      - SLACK_API_URL=${SLACK_API_URL}
+      - SLACK_CHANNEL=${SLACK_CHANNEL}
+      - SMTP_HOSTNAME=${SMTP_HOSTNAME}
+      - SMTP_LOGIN=${SMTP_LOGIN}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_RECIPIENT=${SMTP_RECIPIENT}
+    networks:
+      net_mon:
+        aliases:
+          - alertmanager
+    ports:
+      - 9093:9093
+
+  stackdriver:
+    image: frodenas/stackdriver-exporter:${STACKDRIVER_EXPORTER_VERSION}
+    environment:
+      - STACKDRIVER_EXPORTER_GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID}
+      - STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=${STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES}
+    volumes:
+      - '~/.config/gcloud:/root/.config/gcloud'
+
+    networks:
+      net_mon:
+        aliases:
+          - stackdriver
+    ports:
+      - 9255:9255
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+
+  net_mon:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.3.0/24
+
+  net_back:
+    external:
+      name: reddit_net_back
+
+  net_front:
+    external:
+      name: reddit_net_front

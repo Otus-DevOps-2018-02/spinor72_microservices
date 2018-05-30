@@ -1,0 +1,106 @@
+---
+- name: Configure AWX for autoheal
+  hosts: all
+  vars:
+    autoheal_organization: "{{ lookup('env', 'AUTOHEAL_AWX_ORG') }}"
+    autoheal_project: "{{ lookup('env', 'AUTOHEAL_AWX_PROJECT') }}"
+    autoheal_user: "{{ lookup('env', 'AUTOHEAL_AWX_USER') }}"
+    autoheal_password: "{{ lookup('env', 'AUTOHEAL_AWX_PASSWORD') }}"
+    tower_config_file: tower_cli.cfg
+
+  gather_facts: False
+
+  tasks:
+    - name: Create organization for autoheal
+      tower_organization:
+        name: "{{ autoheal_organization }}"
+        description: "Autoheal organization"
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Add credential
+      tower_credential:
+        name: gituser
+        kind: scm
+        description: git account
+        organization: "{{ autoheal_organization }}"
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+
+    - name: Add project for autoheal
+      tower_project:
+        name: "{{ autoheal_project }}"
+        description: "Autoheal project"
+        organization: "{{ autoheal_organization }}"
+        scm_branch: monitoring-2
+        scm_type: git
+        scm_credential: gituser
+        scm_update_on_launch: yes
+        scm_url: https://github.com/Otus-DevOps-2018-02/spinor72_microservices
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Add autoheal user
+      tower_user:
+        username: "{{ autoheal_user }}"
+        password: "{{ autoheal_password }}"
+        email: autoheal@example.org
+        first_name: Autoheal
+        last_name: Openshift
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Add autoheal inventory
+      tower_inventory:
+        name: "docker-machine"
+        description: "Docker-machine hosts"
+        organization: "{{ autoheal_organization }}"
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Add host to autoheal
+      tower_host:
+        name: docker-host
+        description: "Local Host Group"
+        inventory: "docker-machine"
+        variables:
+          ansible_host: 10.0.3.1
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Add credential
+      tower_credential:
+        name: docker-user
+        kind: ssh
+        become_method: sudo
+        description: ssh key to acces docker-host
+        organization: "{{ autoheal_organization }}"
+        # project: Autoheal
+        username: docker-user
+        ssh_key_data: "{{ lookup('env', 'DOCKER_CERT_PATH') }}/id_rsa"
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Create Start node job template for autoheal jobs
+      tower_job_template:
+        name: "Start node"
+        job_type: run
+        inventory: docker-machine
+        project: "{{ autoheal_project }}"
+        ask_extra_vars: yes
+        playbook: monitoring/autoheal/ansible/playbooks/playbook.yml
+        machine_credential: docker-user
+        state: present
+        tower_config_file: "{{ tower_config_file }}"
+
+    - name: Grant autoheal user execute job
+      command: tower-cli  role grant --user "{{ autoheal_user }}" --type execute --job-template "Start node"
+      # не работает через роль
+      # https://github.com/ansible/ansible/issues/39745
+      # tower_role:
+      #   user: autoheal
+      #   job_template: "Start node"
+      #   role: execute
+      #   state: present
+      # tower_config_file: "~/tower_cli.cfg"

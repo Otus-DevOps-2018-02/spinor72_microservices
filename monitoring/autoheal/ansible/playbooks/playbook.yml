@@ -1,0 +1,9 @@
+---
+- name: Start container
+  hosts: all
+  become: true
+  gather_facts: False
+
+  tasks:
+    - name: Start a container
+      command: docker start reddit_{{ alert.labels.job }}_1
