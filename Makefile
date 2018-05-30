@@ -10,6 +10,7 @@ endif
 # сборка образов, всех сразу или отдельно
 .PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
 build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
+build_src: build_ui build_comment build_post 
 build_ui:
 	cd src/ui && bash docker_build.sh
 build_comment:
@@ -111,7 +112,10 @@ machine:
 	docker-host
 	docker-machine ssh docker-host gcloud auth list
 	docker-machine ip docker-host
-
+static_ip:
+	gcloud compute instances delete-access-config docker-host --access-config-name "external-nat" 
+	gcloud compute instances add-access-config docker-host --access-config-name "external-nat" --address $(GOOGLE_STATIC_IP)
+	docker-machine regenerate-certs docker-host
 
 firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver
 firewall_puma:
@@ -130,6 +134,10 @@ firewall_stackdriver:
 	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
 firewall_awx:
 	gcloud compute firewall-rules create awx-default --allow tcp:8052
+firewall_logging:
+	gcloud compute firewall-rules create allow-tcp-5601-default --allow tcp:5601
+	gcloud compute firewall-rules create allow-tcp-9411-default --allow tcp:9411
+
 
 .PHONY: test_env clean clean_all
 test_env:
