@@ -8,8 +8,8 @@ ifeq ($(USER_NAME),)
 endif
 
 # сборка образов, всех сразу или отдельно
-.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
-build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
+.PHONY: build build_src build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
+build: build_src build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
 build_src: build_ui build_comment build_post 
 build_ui:
 	cd src/ui && bash docker_build.sh
@@ -134,9 +134,14 @@ static_ip:
 	gcloud compute instances add-access-config docker-host --access-config-name "external-nat" --address $(GOOGLE_STATIC_IP)
 	docker-machine regenerate-certs docker-host
 
-firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver
+.PHONY: firewall_puma firewall_mon firewall_logging firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager 
+.PHONY: firewall_docker_metrics firewall_stackdriver firewall_awx firewall_logging
+firewall: firewall_puma firewall_mon firewall_logging 
+# правило дял приложения
 firewall_puma:
 	gcloud compute firewall-rules create puma-default --allow tcp:9090
+# правила дял сервисов мониторинга
+firewall_mon: firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver firewall_awx
 firewall_prom:
 	gcloud compute firewall-rules create prometheus-default --allow tcp:9292
 firewall_cadvisor:
@@ -151,6 +156,7 @@ firewall_stackdriver:
 	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
 firewall_awx:
 	gcloud compute firewall-rules create awx-default --allow tcp:8052
+# правила для логинга
 firewall_logging:
 	gcloud compute firewall-rules create allow-tcp-5601-default --allow tcp:5601
 	gcloud compute firewall-rules create allow-tcp-9411-default --allow tcp:9411
