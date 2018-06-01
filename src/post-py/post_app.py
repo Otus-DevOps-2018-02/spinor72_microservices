@@ -9,7 +9,8 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 from bson.json_util import dumps
 from helpers import http_healthcheck_handler, log_event
-from py_zipkin.zipkin import zipkin_span, ZipkinAttrs
+from py_zipkin.zipkin import zipkin_span, ZipkinAttrs 
+from py_zipkin.transport import BaseTransportHandler
 
 
 CONTENT_TYPE_LATEST = str('text/plain; version=0.0.4; charset=utf-8')
@@ -46,13 +47,23 @@ def init(app):
     ).users_post.posts
 
 
-def http_transport(encoded_span):
-    # The collector expects a thrift-encoded list of spans. Instead of
-    # decoding and re-encoding the already thrift-encoded message, we can just
-    # add header bytes that specify that what follows is a list of length 1.
-    body = '\x0c\x00\x00\x00\x01' + str(encoded_span)
-    requests.post(ZIPKIN_URL, data=body,
-                  headers={'Content-Type': 'application/x-thrift'})
+class Http_Transport(BaseTransportHandler):
+
+    def get_max_payload_bytes(self):
+        return None
+
+    def send(self, encoded_span):
+        # The collector expects a thrift-encoded list of spans.
+        try:
+            requests.post(ZIPKIN_URL,
+                data=encoded_span,
+                headers={'Content-Type': 'application/x-thrift'},
+            )
+        except requests.exceptions.RequestException:
+            tb = traceback.format_exc()
+            log.error('zipkin_error',
+              service='post',
+              traceback=tb)
 
 
 # Prometheus endpoint
@@ -89,7 +100,7 @@ def posts():
             is_sampled=request.headers['X-B3-Sampled'],
         ),
         span_name='/posts',
-        transport_handler=http_transport,
+        transport_handler=Http_Transport(),
         port=5000,
         sample_rate=100,
     ):
@@ -183,7 +194,7 @@ def get_post(id):
             is_sampled=request.headers['X-B3-Sampled'],
         ),
         span_name='/post/<id>',
-        transport_handler=http_transport,
+        transport_handler=Http_Transport(),
         port=5000,
         sample_rate=100,
     ):

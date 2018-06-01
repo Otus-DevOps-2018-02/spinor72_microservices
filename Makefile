@@ -31,7 +31,7 @@ build_autoheal:
 	cd monitoring/autoheal && docker build  -t $(USER_NAME)/autoheal:latest .
 
 build_fluentd:
-	cd logging/fluentd && docker build  -t $(USER_NAME)/fluentd:$(FLUENTD_VERSION) .
+	cd logging/fluentd && docker build --build-arg FLUENTD_VERSION=$(FLUENTD_VERSION)  -t $(USER_NAME)/fluentd:$(FLUENTD_VERSION) .
 
 
 # заливка образов в репозиторий, требуется предварителньо залогиниться
