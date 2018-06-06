@@ -184,3 +184,12 @@ alert:
 populate_awx:
 	echo "host=$(TOWER_HOST) username=$(TOWER_USERNAME) password=$(TOWER_PASSWORD)" > monitoring/autoheal/ansible/playbooks/tower_cli.cfg
 	ansible-playbook -i "localhost," -c local monitoring/autoheal/ansible/playbooks/awx-autoheal.yml
+
+
+kube_deploy_post:
+	cd kubernetes && envsubst < post-deployment.yml | kubectl apply -f -
+
+kube_install:
+	cd kubernetes/the_hard_way && ansible-playbook playbook.yml
+
+
