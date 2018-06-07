@@ -21,6 +21,7 @@
         url: https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
         dest: /usr/local/bin/cfssl
         mode: +x
+      become: yes
 # cfssl version
 # Version: 1.2.0
 
@@ -29,12 +30,14 @@
         url: https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
         dest: /usr/local/bin/cfssljson
         mode: +x
+      become: yes
 
     - name: Download kubectl
       get_url:
         url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl
         dest: /usr/local/bin/kubectl
         mode: +x
+      become: yes
 #  kubectl version --client  version 1.10.2
 
 #  Virtual Private Cloud Network
@@ -164,7 +167,11 @@
       args:
         creates: admin-key.pem
 
-    - name: Workers csr
+# The Kubelet Client Certificates
+# Kubernetes uses a special-purpose authorization mode called Node Authorizer, that specifically authorizes API requests made by Kubelets.
+# In order to be authorized by the Node Authorizer, Kubelets must use a credential that identifies them as being in the system:nodes group,
+# with a username of system:node:<nodeName>
+    - name: The Kubelet Client Certificates
       template:
         src: templates/csr.j2
         dest: "{{ item.instance_data[0].name }}-csr.json"
@@ -175,8 +182,316 @@
       with_items: "{{ kube_workers.results }}"
 
     - name: Create worker cert
-      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ item.instance_data[0].name }},kube_ip.address,{{ item.instance_data[0].private_ip }} -profile=kubernetes {{ item.instance_data[0].name }}-csr.json | cfssljson -bare {{ item.instance_data[0].name }}"
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ item.instance_data[0].name }},{{ kube_ip.address }},{{ item.instance_data[0].private_ip }} -profile=kubernetes {{ item.instance_data[0].name }}-csr.json | cfssljson -bare {{ item.instance_data[0].name }}"
       args:
         creates: "{{ item.instance_data[0].name }}-key.pem"
       with_items: "{{ kube_workers.results }}"
+
+
+# Generate the kube-controller-manager client certificate and private key:
+    - name: The Controller Manager Client Certificate csr
+      template:
+        src: templates/csr.j2
+        dest: "kube-controller-manager-csr.json"
+      vars:
+        cn: "system:kube-controller-manager"
+        o: system:kube-controller-manager
+        ou: Kubernetes The Hard Way
+
+    - name: Create controller manager client certificate
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager"
+      args:
+        creates: "kube-controller-manager-key.pem"
+
+
+    - name: Generate the kube-proxy client certificate csr
+      template:
+        src: templates/csr.j2
+        dest: "kube-proxy-csr.json"
+      vars:
+        cn: "system:kube-proxy"
+        o: system:node-proxier
+        ou: Kubernetes The Hard Way
+
+    - name: Generate the kube-proxy client certificate and private key
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy"
+      args:
+        creates: "kube-proxy-key.pem"
+
+
+    - name: Generate the kube-scheduler client csr
+      template:
+        src: templates/csr.j2
+        dest: "kube-scheduler-csr.json"
+      vars:
+        cn: "system:kube-scheduler"
+        o: system:kube-scheduler
+        ou: Kubernetes The Hard Way
+
+    - name: Generate the kube-scheduler client certificate and private key
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler"
+      args:
+        creates: "kube-scheduler-key.pem"
+
+
+    - name: Generate the Kubernetes API Server csr
+      template:
+        src: templates/csr.j2
+        dest: "kubernetes-csr.json"
+      vars:
+        cn: "kubernetes"
+        o: Kubernetes
+        ou: Kubernetes The Hard Way
+
+    - name: Generate the Kubernetes API Server certificate and private key
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes -hostname=10.32.0.1,{% for item in kube_controllers.results %}{{item.instance_data[0].private_ip}},{% endfor %}{{ kube_ip.address }},127.0.0.1,kubernetes.default kubernetes-csr.json | cfssljson -bare kubernetes"
+      args:
+        creates: "kubernetes.pem"
+
+    - name: Generate the service-account csr
+      template:
+        src: templates/csr.j2
+        dest: "service-account-csr.json"
+      vars:
+        cn: "service-accounts"
+        o: Kubernetes
+        ou: Kubernetes The Hard Way
+
+    - name: Generate the service-account certificate and private key
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account"
+      args:
+        creates: "service-account-key.pem"
+
+# Distribute the Client and Server Certificates
+
+    - name: Copy the appropriate certificates and private keys to each worker instance
+      shell: "gcloud compute  scp ca.pem {{ item.instance_data[0].name }}-key.pem {{ item.instance_data[0].name }}.pem {{ item.instance_data[0].name }}:~/"
+      with_items: "{{ kube_workers.results }}"
+
+    - name: Copy the appropriate certificates and private keys to each controller instance
+      shell: "gcloud compute  scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem {{ item.instance_data[0].name }}:~/"
+      with_items: "{{ kube_controllers.results }}"
+
+# Generate a kubeconfig file for each worker node
+
+    - name: Set cluster config for workers
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://{{ kube_ip.address }}:6443
+        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+      with_items: "{{ kube_workers.results }}"
+
+
+    - name: Set credentials config for workers
+      shell: >
+        kubectl config set-credentials system:node:{{ item.instance_data[0].name }}
+        --client-certificate={{ item.instance_data[0].name }}.pem
+        --client-key={{ item.instance_data[0].name }}-key.pem
+        --embed-certs=true
+        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+      with_items: "{{ kube_workers.results }}"
+
+    - name: Set context config for workers
+      shell: >
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:node:{{ item.instance_data[0].name }}
+        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+      with_items: "{{ kube_workers.results }}"
+
+    - name: Set default context config for workers
+      shell: kubectl config use-context default --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+      with_items: "{{ kube_workers.results }}"
+
+
+
+    - name: Set cluster config for kube-proxy
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://{{ kube_ip.address}}:6443
+        --kubeconfig=kube-proxy.kubeconfig
+
+    - name: Set credentials config for kube-proxy
+      shell: >
+        kubectl config set-credentials system:kube-proxy
+        --client-certificate=kube-proxy.pem
+        --client-key=kube-proxy-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-proxy.kubeconfig
+
+    - name: Set context config for kube-proxy
+      shell: >
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-proxy
+        --kubeconfig=kube-proxy.kubeconfig
+
+    - name: Set default context config for kube-proxy
+      shell: kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
+
+
+
+# Generate a kubeconfig file for the kube-controller-manager service
+    - name: Set cluster config for kube-controller-manager
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=kube-controller-manager.kubeconfig
+
+    - name: Set credentials config for kube-controller-manager
+      shell: >
+        kubectl config set-credentials system:kube-controller-manager
+        --client-certificate=kube-controller-manager.pem
+        --client-key=kube-controller-manager-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-controller-manager.kubeconfig
+
+    - name: Set context config for kube-controller-manager
+      shell: >
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-controller-manager
+        --kubeconfig=kube-controller-manager.kubeconfig
+
+    - name: Set default context config for kube-controller-manager
+      shell: kubectl config use-context default --kubeconfig=kube-controller-manager.kubeconfig
+
+
+#  Generate a kubeconfig file for the kube-scheduler service:
+    - name: Set cluster config for kube-scheduler
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=kube-scheduler.kubeconfig
+
+    - name: Set credentials config for kube-scheduler
+      shell: >
+        kubectl config set-credentials system:kube-scheduler
+        --client-certificate=kube-scheduler.pem
+        --client-key=kube-scheduler-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-scheduler.kubeconfig
+
+    - name: Set context config for kube-scheduler
+      shell: >
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-scheduler
+        --kubeconfig=kube-scheduler.kubeconfig
+
+    - name: Set default context config for kube-scheduler
+      shell: kubectl config use-context default --kubeconfig=kube-scheduler.kubeconfig
+
+
+# Generate a kubeconfig file for the admin user:
+    - name: Set cluster config for the admin user
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=admin.kubeconfig
+
+    - name: Set credentials config for the admin user
+      shell: >
+        kubectl config set-credentials admin
+        --client-certificate=admin.pem
+        --client-key=admin-key.pem
+        --embed-certs=true
+        --kubeconfig=admin.kubeconfig
+
+    - name: Set context config for the admin user
+      shell: >
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=admin
+        --kubeconfig=admin.kubeconfig
+
+    - name: Set default context config for the admin user
+      shell: kubectl config use-context default --kubeconfig=admin.kubeconfig
+
+
+# Distribute the Kubernetes Configuration Files
+    - name: Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance
+      shell: "gcloud compute scp {{ item.instance_data[0].name }}.kubeconfig kube-proxy.kubeconfig {{ item.instance_data[0].name }}:~/"
+      with_items: "{{ kube_workers.results }}"
+
+    - name: Copy the appropriate certificates and private keys to each controller instance
+      shell: "gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig {{ item.instance_data[0].name }}:~/"
+      with_items: "{{ kube_controllers.results }}"
+
+#
+# Generating the Data Encryption Config and Key
+#
+
+    - name: Generate an encryption key
+      shell: head -c 32 /dev/urandom | base64
+      register: encryption_key
+
+    - name: Create the encryption-config.yaml encryption config file
+      template:
+        src: templates/encryption-config.j2
+        dest: encryption-config.yaml
+      vars:
+        ENCRYPTION_KEY: "{{ encryption_key.stdout }}"
+
+    - name: Copy the appropriate certificates and private keys to each controller instance
+      shell: "gcloud compute scp encryption-config.yaml {{ item.instance_data[0].name }}:~/"
+      with_items: "{{ kube_controllers.results }}"
+
+#
+# Bootstrapping the etcd Cluster
+# https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/07-bootstrapping-etcd.md
+#
+    - name: Download the official etcd release binaries from the coreos/etcd GitHub project
+      unarchive:
+        src: https://github.com/coreos/etcd/releases/download/v3.3.5/etcd-v3.3.5-linux-amd64.tar.gz
+        dest: /tmp/
+      remote_src: yes
+
+    - name: Extract and install the etcd server and the etcdctl command line utility
+      copy:
+        src: /tmp/etcd-v3.3.5-linux-amd64/etcd*
+        dest: /usr/local/bin/
+      remote_src: yes
+
+    - name: Configure the etcd Server
+      copy:
+        src: "{{ item }}"
+        dest: /etc/etcd/
+      remote_src: yes
+      with_items:
+        - ca.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+
+    - name: Configure the etcd Server
+      file:
+        path: /var/lib/etcd
+        state: directory
+
+    - name: Create the etcd.service systemd unit file
+      template:
+        src: templates/etcd.service.j2
+        dest: /etc/systemd/system/etcd.service
+      vars:
+        INTERNAL_IP: "{{ kube_ip.address }}"
+        ETCD_NAME: "{{ item.instance_data[0].name }}"
+        CONTROLLERS: "{{ kube_controllers.results }}"
+      with_items: "{{ kube_controllers.results }}"
+
+
+    - name: Start the etcd Server
+      systemd:
+        name: etcd
+        state: started
+        enabled: True
 
