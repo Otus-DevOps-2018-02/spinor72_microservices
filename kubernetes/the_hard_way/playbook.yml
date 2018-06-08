@@ -1,6 +1,5 @@
 ---
-- name: Configure kubernetes
-  # hosts: all
+- name: Configure kubernetes infrastructure
   hosts: localhost
   connection: local
   gather_facts: no
@@ -20,7 +19,7 @@
       get_url:
         url: https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
         dest: /usr/local/bin/cfssl
-        mode: +x
+      mode: +x
       become: yes
 # cfssl version
 # Version: 1.2.0
@@ -29,14 +28,14 @@
       get_url:
         url: https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
         dest: /usr/local/bin/cfssljson
-        mode: +x
+      mode: +x
       become: yes
 
     - name: Download kubectl
       get_url:
         url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl
         dest: /usr/local/bin/kubectl
-        mode: +x
+      mode: +x
       become: yes
 #  kubectl version --client  version 1.10.2
 
@@ -129,9 +128,9 @@
 
     - name: Save Workers to inventory
       add_host:
-        hostname: "{{ item.instance_data[0].public_ip }}"
+        hostname: "{{ item.instance_data[0].name }}"
         groupname: workers
-        ansible_host: "{{ item.instance_data[0].name }}"
+        ansible_host: "{{ item.instance_data[0].public_ip }}"
         private_ip: "{{ item.instance_data[0].private_ip }}"
         pod_cidr: "{{ item.instance_data[0].metadata['pod-cidr'] }}"
       with_items: "{{ kube_workers.results }}"
@@ -287,19 +286,14 @@
         chdir: ca
         creates: "service-account-key.pem"
 
-# Distribute the Client and Server Certificates
+# # Distribute the Client and Server Certificates
 
-    - name: Copy the appropriate certificates and private keys to each worker instance
-      shell: "gcloud compute  scp ca.pem {{ item.instance_data[0].name }}-key.pem {{ item.instance_data[0].name }}.pem {{ item.instance_data[0].name }}:~/"
-      args:
-        chdir: ca
-      with_items: "{{ kube_workers.results }}"
 
-    - name: Copy the appropriate certificates and private keys to each controller instance
-      shell: "gcloud compute  scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem {{ item.instance_data[0].name }}:~/"
-      args:
-        chdir: ca
-      with_items: "{{ kube_controllers.results }}"
+    # - name: Copy the appropriate certificates and private keys to each controller instance
+    #   shell: "gcloud compute  scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem {{ item.instance_data[0].name }}:~/"
+    #   args:
+    #     chdir: ca
+    #   with_items: "{{ kube_controllers.results }}"
 
 # Generate a kubeconfig file for each worker node
 
@@ -489,17 +483,17 @@
 
 
 # Distribute the Kubernetes Configuration Files
-    - name: Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance
-      shell: "gcloud compute scp {{ item.instance_data[0].name }}.kubeconfig kube-proxy.kubeconfig {{ item.instance_data[0].name }}:~/"
-      with_items: "{{ kube_workers.results }}"
-      args:
-        chdir: ca
+    # - name: Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance
+    #   shell: "gcloud compute scp {{ item.instance_data[0].name }}.kubeconfig kube-proxy.kubeconfig {{ item.instance_data[0].name }}:~/"
+    #   with_items: "{{ kube_workers.results }}"
+    #   args:
+    #     chdir: ca
 
-    - name: Copy the appropriate certificates and private keys to each controller instance
-      shell: "gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig {{ item.instance_data[0].name }}:~/"
-      with_items: "{{ kube_controllers.results }}"
-      args:
-        chdir: ca
+    # - name: Copy the appropriate certificates and private keys to each controller instance
+    #   shell: "gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig {{ item.instance_data[0].name }}:~/"
+    #   with_items: "{{ kube_controllers.results }}"
+    #   args:
+    #     chdir: ca
 
 #
 # Generating the Data Encryption Config and Key
@@ -516,9 +510,9 @@
       vars:
         ENCRYPTION_KEY: "{{ encryption_key.stdout }}"
 
-    - name: Copy the appropriate certificates and private keys to each controller instance
-      shell: "gcloud compute scp encryption-config.yaml {{ item.instance_data[0].name }}:~/"
-      with_items: "{{ kube_controllers.results }}"
+    # - name: Copy the appropriate certificates and private keys to each controller instance
+    #   shell: "gcloud compute scp encryption-config.yaml {{ item.instance_data[0].name }}:~/"
+    #   with_items: "{{ kube_controllers.results }}"
 
 #
 # Bootstrapping the etcd Cluster
@@ -535,14 +529,24 @@
         src: https://github.com/coreos/etcd/releases/download/v3.3.5/etcd-v3.3.5-linux-amd64.tar.gz
         dest: /tmp/
         remote_src: yes
+      become: yes
 
     - name: Extract and install the etcd server and the etcdctl command line utility
       copy:
         src: "/tmp/etcd-v3.3.5-linux-amd64/{{ item }}"
         dest: "/usr/local/bin/{{ item }}"
         remote_src: yes
-      mode: +x
+      mode: 0755
       become: yes
+      with_items:
+        - etcd
+        - etcdctl
+
+    - name: chmod etcd and etcdctl
+      become: yes
+      file:
+        path: "/usr/local/bin/{{ item }}"
+        mode: 0755
       with_items:
         - etcd
         - etcdctl
@@ -558,17 +562,16 @@
 
     - name: Configure the etcd Server
       copy:
-        src: "{{ item }}"
+        src: "ca/{{ item }}"
         dest: /etc/etcd/
-        remote_src: yes
       become: yes
       with_items:
         - ca.pem
         - kubernetes-key.pem
         - kubernetes.pem
 
-    - debug:
-        var: hostvars[groups['controllers'][0]]
+    # - debug:
+    #     var: hostvars[groups['controllers'][0]]
 
 
     - name: Create the etcd.service systemd unit file
@@ -580,7 +583,6 @@
         INTERNAL_IP: "{{ private_ip }}"
         ETCD_NAME: "{{ inventory_hostname }}"
         CONTROLLERS: "{{ groups['controllers'] }}"
-# hostvars[groups['controllers'][0]]
 
     - name: Start the etcd Server
       become: yes
@@ -594,7 +596,7 @@
       get_url:
         url: "https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/{{ item }}"
         dest: /usr/local/bin/
-        mode: +x
+        mode: 0755
       become: yes
       with_items:
         - kube-apiserver
@@ -611,14 +613,17 @@
         - /var/lib/kubernetes
         - /etc/kubernetes/config
 
-
-
-    - name: Configure the kubernetes Server certs
-      copy:
-        src: "{{ item }}"
-        dest: /var/lib/kubernetes/
-        remote_src: yes
+    - name: Copy the encryption-config.yaml encryption config file
       become: yes
+      template:
+        src: encryption-config.yaml
+        dest: /var/lib/kubernetes/encryption-config.yaml
+
+    - name: Copy the appropriate certificates and private keys to each controller instance
+      become: yes
+      copy:
+        src: "ca/{{ item }}"
+        dest: /var/lib/kubernetes/
       with_items:
         - ca.pem
         - ca-key.pem
@@ -626,10 +631,9 @@
         - kubernetes-key.pem
         - service-account-key.pem
         - service-account.pem
-        - encryption-config.yaml
+        # - encryption-config.yaml
 
 # Configure the Kubernetes API Server
-
 
     - name: Create the kube-apiserver.service systemd unit file
       template:
@@ -645,9 +649,8 @@
 # Configure the Kubernetes Controller Manager
     - name: Copy the Kubernetes Controller Manager kubeconfig file
       copy:
-        src: "{{ item }}"
+        src: "ca/{{ item }}"
         dest: /var/lib/kubernetes/
-        remote_src: yes
       become: yes
       with_items:
         - kube-controller-manager.kubeconfig
@@ -665,9 +668,8 @@
 
     - name: Copy the kube-scheduler kubeconfig into place
       copy:
-        src: "{{ item }}"
+        src: "ca/{{ item }}"
         dest: /var/lib/kubernetes/
-        remote_src: yes
       become: yes
       with_items:
         - kube-scheduler.kubeconfig
@@ -705,19 +707,19 @@
         name: nginx
         state: present
 
-    - name: Create the kube-scheduler.yaml configuration file
+    - name: Create nginx kubernetes health check config
       become: yes
       template:
         src: templates/kubernetes.default.svc.cluster.local.j2
         dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
 
-    - name: Create symlink to example.com
+    - name: Enable nginx kubernetes health check config
       become: yes
       file: 
         src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
         dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
         state: link
-      # notify: nginx reload
+      notify: restart nginx
 
     - name: Start the nginx service
       become: yes
@@ -728,34 +730,17 @@
       with_items:
         - nginx
 
-# Verification
-
-# kubectl get componentstatuses --kubeconfig admin.kubeconfig
-
-# NAME                 STATUS    MESSAGE              ERROR
-# controller-manager   Healthy   ok
-# scheduler            Healthy   ok
-# etcd-2               Healthy   {"health": "true"}
-# etcd-0               Healthy   {"health": "true"}
-# etcd-1               Healthy   {"health": "true"}
-
-# Test the nginx HTTP health check proxy:
-
-# curl -H "Host: kubernetes.default.svc.cluster.local" -i http://127.0.0.1/healthz
-
-# HTTP/1.1 200 OK
-# Server: nginx/1.14.0 (Ubuntu)
-# Date: Mon, 14 May 2018 13:45:39 GMT
-# Content-Type: text/plain; charset=utf-8
-# Content-Length: 2
-# Connection: keep-alive
-
-# ok
-
 
 # RBAC for Kubelet Authorization
 # In this section you will configure RBAC permissions to allow the Kubernetes API Server
 # to access the Kubelet API on each worker node. Access to the Kubelet API is required for retrieving metrics, logs, and executing commands in pods.
+    - name: Copy admin.kubeconfig file
+      copy:
+        src: "ca/{{ item }}"
+        dest: /tmp
+      become: yes
+      with_items:
+        - admin.kubeconfig
 
     - name: copy role yaml
       copy:
@@ -766,13 +751,24 @@
         - files/system_kube-apiserver-to-kubelet_bind.yaml
 
     - name: Create the system:kube-apiserver-to-kubelet ClusterRole with permissions to access the Kubelet API and perform most common tasks associated with managing pods
-      shell: "kubectl apply --kubeconfig admin.kubeconfig -f {{ item }}"
+      shell: "kubectl apply --kubeconfig /tmp/admin.kubeconfig -f {{ item }}"
       with_items:
         - /tmp/system_kube-apiserver-to-kubelet.yaml
         - /tmp/system_kube-apiserver-to-kubelet_bind.yaml
 
+  handlers:
+    - name: restart nginx
+      become: yes
+      systemd:
+        name: nginx
+        state: restarted
 
+- name: Provision a Network Load Balancer
+  hosts: localhost
 # The Kubernetes Frontend Load Balancer
+  tasks:
+
+    # pip install --upgrade google-api-python-client
     - name: Create HTTP HealthCheck
       gcp_healthcheck:
         # service_account_email: "{{ service_account_email }}"
@@ -780,10 +776,15 @@
         # project_id: "{{ project_id }}"
         healthcheck_name: kubernetes
         healthcheck_type: HTTP
-        host: "kubernetes.default.svc.cluster.local"
+        host_header: "kubernetes.default.svc.cluster.local"
         request_path: /healthz
-        state: present  
-        
+        state: present
+
+# gcloud compute http-health-checks create kubernetes \
+#     --description "Kubernetes Health Check" \
+#     --host "kubernetes.default.svc.cluster.local" \
+#     --request-path "/healthz"
+
     - name: Create a firewall rule for loadbalancer
       gce_net:
         name: kubernetes-the-hard-way
@@ -794,32 +795,47 @@
       with_items:
         - tcp
 
+    - name: list kubernetes-target-pool
+      shell: gcloud compute target-pools list --filter="region":europe-west4
+      register: list_target_pools
+
     - name: create kubernetes-target-pool
-      host: localhost
-      shell: gcloud compute target-pools create kubernetes-target-pool --http-health-check kubernetes
+      shell: gcloud compute target-pools create kubernetes-target-pool --http-health-check kubernetes  --region europe-west4
+      when: "'kubernetes-target-pool' not in list_target_pools.stdout"
 
     - name: add-instances kubernetes-target-pool
-      host: localhost
-      shell: gcloud compute target-pools add-instances kubernetes-target-pool --instances controller-0,controller-1,controller-2
+      shell: gcloud compute target-pools add-instances kubernetes-target-pool --instances controller-1,controller-2,controller-3
+
+    - name: liset forwarding rules
+      shell: gcloud compute forwarding-rules list
+      register: list_forwarding_rules
 
     - name: Create Forwarding_Rule w/reserved static address
-      gcp_forwarding_rule:
-        # service_account_email: "{{ service_account_email }}"
-        # credentials_file: "{{ credentials_file }}"
-        # project_id: "{{ project_id }}"
-        forwarding_rule_name: kubernetes-forwarding-rule
-        protocol: TCP
-        port_range: 6443
-        address: kubernetes-the-hard-way
-        region: "{{ region }}"
-        target: my-target-proxy
-        state: present
+      shell: >
+        gcloud compute forwarding-rules create kubernetes-forwarding-rule
+        --address {{ kube_ip.address }}
+        --ports 6443
+        --region {{ kube_ip.region }}
+        --target-pool kubernetes-target-pool
+      when: "'kubernetes-forwarding-rule' not in list_forwarding_rules.stdout"
+      # gcp_forwarding_rule:
+      #   # service_account_email: "{{ service_account_email }}"
+      #   # credentials_file: "{{ credentials_file }}"
+      #   # project_id: "{{ project_id }}"
+      #   forwarding_rule_name: kubernetes-forwarding-rule
+      #   protocol: TCP
+      #   port_range: 6443
+      #   address: kubernetes-the-hard-way
+      #   region: global
+      #   target: kubernetes-target-pool
+      #   state: present
 
 #
 # Bootstrapping the Kubernetes Worker Nodes
 # https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/09-bootstrapping-kubernetes-workers.md
 - name: Bootstrapping the Kubernetes Worker Nodes
   hosts: workers
+  become: yes
   vars:
     ansible_ssh_private_key_file: /home/raa/.ssh/google_compute_engine
     # ansible_user: 
@@ -829,9 +845,25 @@
         name: "{{ item }}"
         state: present
       with_items:
-        - socat 
-        - conntrack 
+        - socat
+        - conntrack
         - ipset
+
+    - name: Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance
+      copy:
+        src: "ca/{{ item }}.kubeconfig"
+        dest: ~/
+      with_items:
+        - "{{ inventory_hostname }}"
+        - kube-proxy
+
+# Distribute the Client and Server Certificates
+
+    # - name: Copy the appropriate certificates and private keys to each worker instance
+    #   copy:
+    #     src: "ca/{{ item }}" "gcloud compute  scp ca.pem {{ item.instance_data[0].name }}-key.pem {{ item.instance_data[0].name }}.pem {{ item.instance_data[0].name }}:~/"
+    #     dest:
+    #   with_items: "{{ kube_workers.results }}"
 
     - name : Download and Install Worker Binaries
       get_url:
@@ -848,7 +880,6 @@
         - https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubelet
 
     - name: Create the installation directories
-      become: yes
       file:
         path: "{{ item }}"
         state: directory
@@ -860,34 +891,44 @@
         - /var/lib/kubernetes
         - /var/run/kubernetes
 
-    - name: Install the worker binaries
-      become: yes
+    - name: Install the worker kube binaries
       copy:
         src: /tmp/{{ item }}
         dest: /usr/local/bin/
-      mode: +x
+        remote_src: true
+      mode: 0754
       with_items:
         - kubectl
         - kube-proxy
         - kubelet
-        - runc runsc
+        - runsc
 
-    - name: Unpack the worker binaries
+    - name: Install the worker kube binaries
+      copy:
+        src: /tmp/runc.amd64
+        dest: /usr/local/bin/runc
+        remote_src: true
+      mode: 0754
+
+
+    - name: Unpack the worker  crictl cni-plugins binaries
       become: yes
       unarchive:
         src: /tmp/{{ item }}
         dest: /usr/local/bin/
-      mode: +x
+        remote_src: true
+      mode: 0754
       with_items:
         - crictl-v1.0.0-beta.0-linux-amd64.tar.gz
         - cni-plugins-amd64-v0.6.0.tgz
 
-    - name: Unpack the worker binaries
+    - name: Unpack the worker containerd
       become: yes
       unarchive:
         src: /tmp/{{ item }}
         dest: /
-      mode: +x
+        remote_src: true
+      mode: 0754
       with_items:
         - containerd-1.1.0.linux-amd64.tar.gz
 
@@ -900,7 +941,7 @@
       register: pod_cidr
 
     - debug:
-        var: pod_cdr
+        var: pod_cidr
 
     - name: Create the bridge network configuration file
       become: yes
@@ -947,6 +988,7 @@
         - {"src":"ca/{{inventory_hostname}}.pem", "dest":"/var/lib/kubelet/"}
         - {"src":"ca/{{inventory_hostname}}.kubeconfig", "dest":"/var/lib/kubelet/kubeconfig"}
         - {"src":"ca/ca.pem", "dest":"/var/lib/kubernetes/"}
+        - {"src":"ca/kube-proxy.kubeconfig", "dest":"/var/lib/kube-proxy/kubeconfig"}
 
     - name: Create the kubelet-config.yaml configuration file
       become: yes
@@ -962,6 +1004,14 @@
       copy:
         src: files/kubelet.service
         dest: /etc/systemd/system/kubelet.service
+
+# Configure the Kubernetes Proxy
+    - name: Create the kube-proxy.service systemd unit file
+      become: yes
+      copy:
+        src: files/kube-proxy.service
+        dest: /etc/systemd/system/kube-proxy.service
+
 
     - name: Start the Worker Services
       systemd:
@@ -1004,7 +1054,7 @@
         kubectl config set-cluster kubernetes-the-hard-way
         --certificate-authority=ca/ca.pem 
         --embed-certs=true 
-        --server=https://{{ kube_ip}}:6443
+        --server=https://{{ kube_ip.address}}:6443
       # args:
       #   chdir: ca
     - name: Addd credentials as the admin user
