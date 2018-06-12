@@ -1,0 +1,148 @@
+---
+- name: Configure kubernetes infrastructure
+  hosts: localhost
+  gather_facts: no
+
+#  When running Ansible inside a GCE VM you can use the service account credentials from the local metadata server
+# by setting both service_account_email and credentials_file to a blank string
+
+  tasks:
+    - name: Delete Kubernetes Controllers
+      gce:
+        name: "controller-{{ item }}"
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        zone: "{{ zone }}"
+        state: absent
+      with_sequence: count={{ controllers_count }}
+
+    - name: Delete Kubernetes Workers
+      gce:
+        name: "worker-{{ item }}"
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        network: kubernetes-the-hard-way
+        subnetwork:  kubernetes
+        # private-network-ip 10.240.0.2${i}
+        zone: "{{ zone }}"
+        state: absent
+      with_sequence: count={{workers_count}}
+
+    - name: Delete a firewall rule that allows internal communication across all protocols
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-{{ item |replace(':', '-') }}-internal"
+        allowed: "{{ item }}"
+        state: "absent"
+        src_range: ['10.240.0.0/24','10.200.0.0/16']
+      with_items:
+        - tcp
+        - udp
+        - icmp
+
+    - name: List Forwarding_Rule w/reserved static address
+      shell: >
+        gcloud compute forwarding-rules list --filter="region":{{ region }}
+      changed_when: False
+      register: list_forwarding_rules
+
+
+    - name: Delete Forwarding_Rule w/reserved static address
+      shell: >
+        gcloud compute forwarding-rules delete kubernetes-forwarding-rule --region {{ region }} --quiet
+      when: "'kubernetes-forwarding-rule' in list_forwarding_rules.stdout"
+
+    - name: list kubernetes-target-pool
+      shell: gcloud compute target-pools list --filter="region":{{ region }}
+      changed_when: False
+      register: list_target_pools
+
+    - name: Delete kubernetes-target-pool
+      shell: gcloud compute target-pools delete kubernetes-target-pool -q --region={{ region }}
+      when: "'kubernetes-target-pool' in list_target_pools.stdout"
+
+    - name: list compute http-health-checks
+      shell: gcloud compute http-health-checks list
+      changed_when: False
+      register: list_health_checks
+
+    - name: Delete compute http-health-checks
+      shell: gcloud -q compute http-health-checks delete kubernetes
+      when: "'kubernetes' in list_health_checks.stdout"
+
+    - name: list compute addresses
+      shell: gcloud compute addresses list
+      changed_when: False
+      register: list_compute_addresses
+
+    - name: Delete compute addresses
+      shell: gcloud -q compute addresses delete kubernetes-the-hard-way --region={{ region }}
+      when: "'kubernetes-the-hard-way' in list_compute_addresses.stdout"
+
+    - name: Delete a firewall rule that allows external SSH, ICMP, and HTTPS
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-{{ item |replace(':', '-') }}-external"
+        allowed: "{{ item }}"
+        state: "absent"
+        src_range: ['0.0.0.0/0']
+      with_items:
+        - tcp:22
+        - tcp:6443
+        - icmp
+
+    - name: Delete a firewall rule for loadbalancer
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-health-check"
+        state: "absent"
+
+    - name: list compute routes
+      shell: gcloud compute routes list
+      changed_when: False
+      register: list_routes
+
+    - name: Delete network routes for each worker instance
+      shell: >
+        gcloud compute routes delete -q kubernetes-route-10-200-{{ item }}-0-24
+      with_sequence: count=3
+      when:  "'kubernetes-route-10-200-'+item+'-0-24' in list_routes.stdout"
+      # when:  list_routes.stdout | regex_search('kubernetes-route-10-200-'+item+'24') 
+
+    - name: Delete kubernetes Network
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        mode: custom
+        subnet_name: "kubernetes"
+        subnet_region: "{{ region }}"
+        state: "absent"
+
+    - name: Delete kubernetes Network
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        state: "absent"
+
+    - name: Clean work path
+      file:
+        state: absent
+        path: "{{ work_path }}/"
+      when: clean_work_path
+
+
