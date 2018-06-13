@@ -3,9 +3,6 @@
   hosts: localhost
   gather_facts: no
 
-#  When running Ansible inside a GCE VM you can use the service account credentials from the local metadata server
-# by setting both service_account_email and credentials_file to a blank string
-
   tasks:
     - name: Delete Kubernetes Controllers
       gce:
@@ -50,7 +47,6 @@
         gcloud compute forwarding-rules list --filter="region":{{ region }}
       changed_when: False
       register: list_forwarding_rules
-
 
     - name: Delete Forwarding_Rule w/reserved static address
       shell: >
@@ -144,5 +140,3 @@
         state: absent
         path: "{{ work_path }}/"
       when: clean_work_path
-
-

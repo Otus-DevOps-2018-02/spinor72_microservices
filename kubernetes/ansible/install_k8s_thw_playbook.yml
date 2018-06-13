@@ -164,29 +164,27 @@
         - kube-proxy
         - kube-scheduler
         - service-account
-# The Kubelet Client Certificates
-# Kubernetes uses a special-purpose authorization mode called Node Authorizer, that specifically authorizes API requests made by Kubelets.
-# In order to be authorized by the Node Authorizer, Kubelets must use a credential that identifies them as being in the system:nodes group,
-# with a username of system:node:<nodeName>
+
+# The Kubelet Client Certificates with a username of system:node:<nodeName>
     - name: The Kubelet Client Certificates
       template:
         src: templates/csr.j2
-        dest: "{{ work_path }}/{{ item.instance_data[0].name }}-csr.json"
+        dest: "{{ work_path }}/{{ hostvars[item].inventory_hostname }}-csr.json"
       vars:
-        cn: "system:node:{{ item.instance_data[0].name }}" 
+        cn: "system:node:{{ hostvars[item].inventory_hostname }}"
         o: system:nodes
         ou: Kubernetes The Hard Way
-      with_items: "{{ kube_workers.results }}"
+      with_items: "{{ groups['workers'] }}"
 
     - name: Create worker cert
-      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ item.instance_data[0].name }},{{ kube_ip.address }},{{ item.instance_data[0].private_ip }} -profile=kubernetes {{ item.instance_data[0].name }}-csr.json | cfssljson -bare {{ item.instance_data[0].name }}"
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ hostvars[item].inventory_hostname }},{{ kube_ip.address }},{{ hostvars[item].private_ip }} -profile=kubernetes {{ hostvars[item].inventory_hostname }}-csr.json | cfssljson -bare {{ hostvars[item].inventory_hostname }}"
       args:
         chdir: "{{ work_path }}"
-        creates: "{{ item.instance_data[0].name }}-key.pem"
-      with_items: "{{ kube_workers.results }}"
+        creates: "{{ hostvars[item].inventory_hostname }}-key.pem"
+      with_items: "{{ groups['workers'] }}"
 
     - name: Generate the Kubernetes API Server certificate and private key
-      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes -hostname=10.32.0.1,{% for item in kube_controllers.results %}{{item.instance_data[0].private_ip}},{% endfor %}{{ kube_ip.address }},127.0.0.1,kubernetes.default kubernetes-csr.json | cfssljson -bare kubernetes"
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes -hostname=10.32.0.1,{% for item in groups['controllers'] %}{{hostvars[item].private_ip}},{% endfor %}{{ kube_ip.address }},127.0.0.1,kubernetes.default kubernetes-csr.json | cfssljson -bare kubernetes"
       args:
         chdir: "{{ work_path }}"
         creates: "kubernetes.pem"
@@ -198,24 +196,24 @@
         --certificate-authority=ca.pem
         --embed-certs=true
         --server=https://{{ kube_ip.address }}:6443
-        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
         &&
-        kubectl config set-credentials system:node:{{ item.instance_data[0].name }}
-        --client-certificate={{ item.instance_data[0].name }}.pem
-        --client-key={{ item.instance_data[0].name }}-key.pem
+        kubectl config set-credentials system:node:{{ hostvars[item].inventory_hostname }}
+        --client-certificate={{ hostvars[item].inventory_hostname }}.pem
+        --client-key={{ hostvars[item].inventory_hostname }}-key.pem
         --embed-certs=true
-        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
         &&
         kubectl config set-context default
         --cluster=kubernetes-the-hard-way
-        --user=system:node:{{ item.instance_data[0].name }}
-        --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+        --user=system:node:{{ hostvars[item].inventory_hostname }}
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
         &&
-        kubectl config use-context default --kubeconfig={{ item.instance_data[0].name }}.kubeconfig
+        kubectl config use-context default --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
       args:
         chdir: "{{ work_path }}"
-        creates: "{{ item.instance_data[0].name }}.kubeconfig"
-      with_items: "{{ kube_workers.results }}"
+        creates: "{{ hostvars[item].inventory_hostname }}.kubeconfig"
+      with_items: "{{ groups['workers'] }}"
 
     - name: Set cluster, credentials, context config and set default context for  kube-proxy
       shell: >
@@ -438,9 +436,8 @@
         - kubernetes-key.pem
         - service-account-key.pem
         - service-account.pem
-        # - encryption-config.yaml
 
-# Configure the Kubernetes API Server
+# Configure the Kubernetes API Server, Controller Manager, Scheduler
 
     - name: Create the kube-apiserver.service systemd unit file
       template:
@@ -450,8 +447,6 @@
         INTERNAL_IP: "{{ private_ip }}"
         CONTROLLERS: "{{ groups['controllers'] }}"
 
-
-# Configure the Kubernetes Controller Manager
     - name: Copy the Kubernetes Controller Manager kubeconfig file
       copy:
         src: "{{ work_path }}/{{ item }}"
@@ -464,14 +459,10 @@
         src: templates/kube-controller-manager.service.j2
         dest: /etc/systemd/system/kube-controller-manager.service
 
-
-# Configure the Kubernetes Scheduler
-
     - name: Copy the kube-scheduler kubeconfig into place
       copy:
         src: "{{ work_path }}/{{ item }}"
         dest: /var/lib/kubernetes/
-      become: yes
       with_items:
         - kube-scheduler.kubeconfig
 
@@ -479,18 +470,14 @@
       template:
         src: templates/kube-scheduler.yaml.j2
         dest: /etc/kubernetes/config/kube-scheduler.yaml
-      become: yes
-
 
     - name: Create the kube-scheduler.service systemd unit file
       template:
         src: templates/kube-scheduler.service.j2
         dest: /etc/systemd/system/kube-scheduler.service
-      become: yes
 
 
     - name: Start the Controller Services
-      become: yes
       systemd:
         name: "{{ item }}"
         state: started
@@ -503,19 +490,16 @@
 
 # Enable HTTP Health Checks
     - name: Install a basic web server to handle HTTP health checks
-      become: yes
       apt:
         name: nginx
         state: present
 
     - name: Create nginx kubernetes health check config
-      become: yes
       template:
         src: templates/kubernetes.default.svc.cluster.local.j2
         dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
 
     - name: Enable nginx kubernetes health check config
-      become: yes
       file: 
         src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
         dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
@@ -523,7 +507,6 @@
       notify: restart nginx
 
     - name: Start the nginx service
-      become: yes
       systemd:
         name: "{{ item }}"
         state: started
@@ -538,7 +521,6 @@
       copy:
         src: "{{ work_path }}/{{ item }}"
         dest: /tmp
-      become: yes
       with_items:
         - admin.kubeconfig
 
@@ -559,7 +541,6 @@
 
   handlers:
     - name: restart nginx
-      become: yes
       systemd:
         name: nginx
         state: restarted
@@ -845,4 +826,4 @@
 
     - name: Deploy the kube-dns cluster add-on
       shell: kubectl create -f https://storage.googleapis.com/kubernetes-the-hard-way/kube-dns.yaml
-      when: "'kube-dns' notin list_kube_dns.stdout"
+      when: "'kube-dns' not in list_kube_dns.stdout"

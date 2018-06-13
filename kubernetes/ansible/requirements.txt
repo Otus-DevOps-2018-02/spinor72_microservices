@@ -1,0 +1,4 @@
+ansible>=2.5
+google-api-python-client>=1.6
+google-auth>=1.5
+google-auth-httplib2 >= 0.0.2

@@ -21,4 +21,3 @@ local:
   hosts:
     localhost:
       ansible_connection: local
-

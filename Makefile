@@ -198,10 +198,10 @@ k8s_deploy_ui:
 
 
 k8s_install_thw:
-	cd kubernetes/ansible && ansible-playbook -i inventory.yml playbook.yml
+	cd kubernetes/ansible && ansible-playbook -i inventory.yml install_k8s_thw_playbook.yml
 
 k8s_clean_thw:
-	cd kubernetes/ansible && ansible-playbook -i inventory.yml cleanup.yml
+	cd kubernetes/ansible && ansible-playbook -i inventory.yml cleanup_k8s_thw_playbook.yml
 
 k8s_utils:
 	cd kubernetes/ansible && ansible-playbook -i inventory.yml --ask-become-pass kubectl.yml
