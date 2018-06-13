@@ -1,5 +1,5 @@
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: ui
@@ -20,5 +20,5 @@ spec:
         component: ui
     spec:
       containers:
-      - image: spinor72/ui
+      - image: spinor72/ui:latest
         name: ui
