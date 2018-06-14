@@ -15,6 +15,11 @@ services:
       - ${UI_PORT}:${UI_PORT}/tcp
     networks:
       net_front:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
 
   post:
     image: ${USER_NAME}/post:${POST_VERSION}
@@ -25,6 +30,11 @@ services:
       net_front:
         aliases:
           - post
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
 
   comment:
     image: ${USER_NAME}/comment:${COMMENT_VERSION}
@@ -41,15 +51,10 @@ volumes:
 
 networks:
   net_back:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-      - subnet: 10.0.2.0/24
+    external:
+      name: reddit_net_back
 
   net_front:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-      - subnet: 10.0.1.0/24
+    external:
+      name: reddit_net_front
+

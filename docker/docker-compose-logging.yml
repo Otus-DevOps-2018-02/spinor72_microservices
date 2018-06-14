@@ -1,0 +1,63 @@
+version: '3'
+services:
+  fluentd:
+    image: ${USER_NAME}/fluentd:${FLUENTD_VERSION}
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    networks:
+      net_back:
+        aliases:
+          - fluentd
+      net_front:
+        aliases:
+          - fluentd
+
+  elasticsearch:
+    image: elasticsearch
+    expose:
+      - 9200
+    ports:
+      - "9200:9200"
+    networks:
+      net_back:
+        aliases:
+          - elasticsearch
+
+
+  kibana:
+    image: kibana
+    ports:
+      - "5601:5601"
+    networks:
+      net_back:
+        aliases:
+          - kibana
+
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      net_back:
+        aliases:
+          - zipkin
+      net_front:
+        aliases:
+          - zipkin
+
+
+networks:
+  net_back:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.2.0/24
+
+  net_front:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.1.0/24

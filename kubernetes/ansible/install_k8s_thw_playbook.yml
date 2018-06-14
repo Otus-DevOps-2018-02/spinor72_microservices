@@ -1,0 +1,829 @@
+---
+- name: Configure kubernetes infrastructure
+  hosts: localhost
+  gather_facts: no
+  tasks:
+#  Virtual Private Cloud Network
+    - name: Create kubernetes Network
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        mode: custom
+        subnet_name: "kubernetes"
+        subnet_region: "{{ region }}"
+        ipv4_range: '10.240.0.0/24'
+        state: "present"
+
+    - name: Create a firewall rule that allows internal communication across all protocols
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-{{ item |replace(':', '-') }}-internal"
+        allowed: "{{ item }}"
+        state: "present"
+        src_range: ['10.240.0.0/24','10.200.0.0/16']
+      with_items:
+        - tcp
+        - udp
+        - icmp
+
+    - name: Create a firewall rule that allows external SSH, ICMP, and HTTPS
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-{{ item |replace(':', '-') }}-external"
+        allowed: "{{ item }}"
+        state: "present"
+        src_range: ['0.0.0.0/0']
+      with_items:
+        - tcp:22
+        - tcp:6443
+        - icmp
+
+    - name: Reserve Kubernetes Public IP Address
+      gce_eip:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        region: "{{ region }}"
+        state: present
+      register: kube_ip
+
+# Kubernetes VMs
+    - name: Create Kubernetes Controllers
+      gce:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: "controller-{{ item }}"
+        machine_type: "n1-standard-1"
+        disk_size: 200
+        ip_forward: yes
+        image: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts
+        service_account_permissions: compute-rw,storage-ro,service-management,service-control,logging-write,monitoring
+        network: kubernetes-the-hard-way
+        subnetwork:  kubernetes
+        zone: "{{ zone }}"
+        tags: kubernetes-the-hard-way,controller
+        metadata: '{"ssh-keys":"{{ ansible_user }}:{{ ssh_pub_key}}"}'
+      with_sequence: count={{ controllers_count }}
+      register: kube_controllers
+
+    - name: Save controllers to inventory
+      add_host:
+        hostname: "{{ item.instance_data[0].name }}"
+        groupname: controllers
+        ansible_host: "{{ item.instance_data[0].public_ip }}"
+        private_ip: "{{ item.instance_data[0].private_ip }}"
+      with_items: "{{ kube_controllers.results }}"
+
+    - name: Create Kubernetes Workers
+      gce:
+        name: "worker-{{ item }}"
+        machine_type: "n1-standard-1"
+        disk_size: 200
+        ip_forward: yes
+        image: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts
+        metadata: '{"pod-cidr":"10.200.{{ item }}.0/24","ssh-keys":"{{ ansible_user }}:{{ ssh_pub_key}}"}'
+        service_account_permissions: compute-rw,storage-ro,service-management,service-control,logging-write,monitoring
+        network: kubernetes-the-hard-way
+        subnetwork:  kubernetes
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        zone: "{{ zone }}"
+        tags: kubernetes-the-hard-way,worker
+      with_sequence: count={{ workers_count }}
+      register: kube_workers
+
+    - name: Save Workers to inventory
+      add_host:
+        hostname: "{{ item.instance_data[0].name }}"
+        groupname: workers
+        ansible_host: "{{ item.instance_data[0].public_ip }}"
+        private_ip: "{{ item.instance_data[0].private_ip }}"
+        pod_cidr: "{{ item.instance_data[0].metadata['pod-cidr'] }}"
+        kubernetes_route: kubernetes-route-{{item.instance_data[0].metadata['pod-cidr'] | replace(".", "-") |replace("/", "-")}}
+      with_items: "{{ kube_workers.results }}"
+
+# Kubernetes certs
+    - name: create CA directory
+      file:
+        path: "{{ work_path }}"
+        state: directory
+
+    - name: copy CA config file to ca dir
+      copy:
+        src: ca-config.json
+        dest: "{{ work_path }}/"
+
+    - name: Create csr files
+      template:
+        src: templates/csr.j2
+        dest: "{{work_path}}/{{ item.name}}-csr.json"
+      vars:
+        cn: "{{ item.cn }}"
+        o: "{{ item.o }}"
+        ou: "{{ item.ou }}"
+      with_items:
+        - {"name":"ca", "cn":"Kubernetes", "o":"Kubernetes", "ou":"CA"}
+        - {"name":"admin", "cn":"admin", "o":"system:masters", "ou":"Kubernetes The Hard Way"}
+        - {"name":"kube-controller-manager", "cn":"system:kube-controller-manager", "o":"system:kube-controller-manager", "ou":"Kubernetes The Hard Way"}
+        - {"name":"kube-proxy", "cn":"system:kube-proxy", "o":"system:node-proxier", "ou":"Kubernetes The Hard Way"}
+        - {"name":"kube-scheduler", "cn":"system:kube-scheduler", "o":"system:kube-scheduler", "ou":"Kubernetes The Hard Way"}
+        - {"name":"kubernetes", "cn":"kubernetes", "o":"Kubernetes", "ou":"Kubernetes The Hard Way"}
+        - {"name":"service-account", "cn":"service-accounts", "o":"Kubernetes", "ou":"Kubernetes The Hard Way"}
+
+    - name: Create CA cert
+      shell: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+      args:
+        chdir: "{{ work_path }}"
+        creates: ca-key.pem
+
+    - name: Create admin cert
+      shell: |
+        cfssl gencert \
+        -ca=ca.pem \
+        -ca-key=ca-key.pem \
+        -config=ca-config.json \
+        -profile=kubernetes \
+        {{ item }}-csr.json | cfssljson -bare {{ item }}
+      args:
+        chdir: "{{ work_path }}"
+        creates: "{{ item }}-key.pem"
+      with_items:
+        - admin
+        - kube-controller-manager
+        - kube-proxy
+        - kube-scheduler
+        - service-account
+
+# The Kubelet Client Certificates with a username of system:node:<nodeName>
+    - name: The Kubelet Client Certificates
+      template:
+        src: templates/csr.j2
+        dest: "{{ work_path }}/{{ hostvars[item].inventory_hostname }}-csr.json"
+      vars:
+        cn: "system:node:{{ hostvars[item].inventory_hostname }}"
+        o: system:nodes
+        ou: Kubernetes The Hard Way
+      with_items: "{{ groups['workers'] }}"
+
+    - name: Create worker cert
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ hostvars[item].inventory_hostname }},{{ kube_ip.address }},{{ hostvars[item].private_ip }} -profile=kubernetes {{ hostvars[item].inventory_hostname }}-csr.json | cfssljson -bare {{ hostvars[item].inventory_hostname }}"
+      args:
+        chdir: "{{ work_path }}"
+        creates: "{{ hostvars[item].inventory_hostname }}-key.pem"
+      with_items: "{{ groups['workers'] }}"
+
+    - name: Generate the Kubernetes API Server certificate and private key
+      shell: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes -hostname=10.32.0.1,{% for item in groups['controllers'] %}{{hostvars[item].private_ip}},{% endfor %}{{ kube_ip.address }},127.0.0.1,kubernetes.default kubernetes-csr.json | cfssljson -bare kubernetes"
+      args:
+        chdir: "{{ work_path }}"
+        creates: "kubernetes.pem"
+
+# Generate a kubeconfig file for each worker node
+    - name: Set cluster, credentials, context config and set default context for workers
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://{{ kube_ip.address }}:6443
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
+        &&
+        kubectl config set-credentials system:node:{{ hostvars[item].inventory_hostname }}
+        --client-certificate={{ hostvars[item].inventory_hostname }}.pem
+        --client-key={{ hostvars[item].inventory_hostname }}-key.pem
+        --embed-certs=true
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
+        &&
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:node:{{ hostvars[item].inventory_hostname }}
+        --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
+        &&
+        kubectl config use-context default --kubeconfig={{ hostvars[item].inventory_hostname }}.kubeconfig
+      args:
+        chdir: "{{ work_path }}"
+        creates: "{{ hostvars[item].inventory_hostname }}.kubeconfig"
+      with_items: "{{ groups['workers'] }}"
+
+    - name: Set cluster, credentials, context config and set default context for  kube-proxy
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://{{ kube_ip.address}}:6443
+        --kubeconfig=kube-proxy.kubeconfig
+        &&
+        kubectl config set-credentials system:kube-proxy
+        --client-certificate=kube-proxy.pem
+        --client-key=kube-proxy-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-proxy.kubeconfig
+        &&
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-proxy
+        --kubeconfig=kube-proxy.kubeconfig
+        &&
+        kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
+      args:
+        chdir: "{{ work_path }}"
+        creates: "kube-proxy.kubeconfig"
+
+
+# Generate a kubeconfig file for the kube-controller-manager service
+    - name: Set cluster, credentials, context config and set default context for  kube-controller-manager
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=kube-controller-manager.kubeconfig
+        &&
+        kubectl config set-credentials system:kube-controller-manager
+        --client-certificate=kube-controller-manager.pem
+        --client-key=kube-controller-manager-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-controller-manager.kubeconfig
+        &&
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-controller-manager
+        --kubeconfig=kube-controller-manager.kubeconfig
+        &&
+        kubectl config use-context default --kubeconfig=kube-controller-manager.kubeconfig
+      args:
+        chdir: "{{ work_path }}"
+        creates: "kube-controller-manager.kubeconfig"
+
+
+#  Generate a kubeconfig file for the kube-scheduler service:
+    - name: Set cluster, credentials, context config and set default context for  kube-scheduler
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=kube-scheduler.kubeconfig
+        &&
+        kubectl config set-credentials system:kube-scheduler
+        --client-certificate=kube-scheduler.pem
+        --client-key=kube-scheduler-key.pem
+        --embed-certs=true
+        --kubeconfig=kube-scheduler.kubeconfig
+        &&
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=system:kube-scheduler
+        --kubeconfig=kube-scheduler.kubeconfig
+        &&
+        kubectl config use-context default --kubeconfig=kube-scheduler.kubeconfig
+      args:
+        chdir: "{{ work_path }}"
+        creates: "kube-scheduler.kubeconfig"
+
+
+# Generate a kubeconfig file for the admin user:
+    - name: Set cluster, credentials, context config and set default context for the admin user
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority=ca.pem
+        --embed-certs=true
+        --server=https://127.0.0.1:6443
+        --kubeconfig=admin.kubeconfig
+        &&
+        kubectl config set-credentials admin
+        --client-certificate=admin.pem
+        --client-key=admin-key.pem
+        --embed-certs=true
+        --kubeconfig=admin.kubeconfig
+        &&
+        kubectl config set-context default
+        --cluster=kubernetes-the-hard-way
+        --user=admin
+        --kubeconfig=admin.kubeconfig
+        &&
+        kubectl config use-context default --kubeconfig=admin.kubeconfig
+      args:
+        chdir: "{{ work_path }}"
+        creates: "admin.kubeconfig"
+
+#
+# Generating the Data Encryption Config and Key
+#
+    - name: Generate an encryption key
+      shell: head -c 32 /dev/urandom | base64 > {{ work_path }}/encryption.key
+      # register: encryption_key
+      args:
+        creates: "{{ work_path }}/encryption.key"
+
+    - name: Create the encryption-config.yaml encryption config file
+      template:
+        src: templates/encryption-config.j2
+        dest: "{{ work_path }}/encryption-config.yaml"
+      vars:
+        ENCRYPTION_KEY: "{{ lookup('file', '{{ work_path }}/encryption.key')  }}"
+
+#
+# Bootstrapping the etcd Cluster
+# https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/07-bootstrapping-etcd.md
+#
+- name: Bootstrapping the etcd Cluster
+  hosts: controllers
+  gather_facts: no
+  become: yes
+  tasks:
+
+    - name: Download the official etcd release binaries from the coreos/etcd GitHub project
+      unarchive:
+        src: https://github.com/coreos/etcd/releases/download/v3.3.5/etcd-v3.3.5-linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Extract and install the etcd server and the etcdctl command line utility
+      copy:
+        src: "/tmp/etcd-v3.3.5-linux-amd64/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        remote_src: yes
+        mode: 0755
+      with_items:
+        - etcd
+        - etcdctl
+
+    - name: chmod etcd and etcdctl
+      file:
+        path: "/usr/local/bin/{{ item }}"
+        mode: 0755
+      with_items:
+        - etcd
+        - etcdctl
+
+    - name: Configure the etcd Server dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /var/lib/etcd
+        - /etc/etcd/
+
+    - name: Configure the etcd Server
+      copy:
+        src: "{{ work_path }}/{{ item }}"
+        dest: /etc/etcd/
+      with_items:
+        - ca.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+
+    - name: Create the etcd.service systemd unit file
+      template:
+        src: templates/etcd.service.j2
+        dest: /etc/systemd/system/etcd.service
+      vars:
+        INTERNAL_IP: "{{ private_ip }}"
+        ETCD_NAME: "{{ inventory_hostname }}"
+        CONTROLLERS: "{{ groups['controllers'] }}"
+
+    - name: Start the etcd Server
+      systemd:
+        name: etcd
+        state: started
+        enabled: True
+
+# Provision the Kubernetes Control Plane
+    - name: Download and Install the Kubernetes Controller Binaries
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/{{ item }}"
+        dest: /usr/local/bin/
+        mode: 0755
+      become: yes
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+        - kubectl
+
+    - name: Configure the kubernetes Server dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /var/lib/kubernetes
+        - /etc/kubernetes/config
+
+    - name: Copy the encryption-config.yaml encryption config file
+      template:
+        src: "{{ work_path }}/encryption-config.yaml"
+        dest: /var/lib/kubernetes/encryption-config.yaml
+
+    - name: Copy the appropriate certificates and private keys to each controller instance
+      copy:
+        src: "{{ work_path }}/{{ item }}"
+        dest: /var/lib/kubernetes/
+      with_items:
+        - ca.pem
+        - ca-key.pem
+        - kubernetes.pem
+        - kubernetes-key.pem
+        - service-account-key.pem
+        - service-account.pem
+
+# Configure the Kubernetes API Server, Controller Manager, Scheduler
+
+    - name: Create the kube-apiserver.service systemd unit file
+      template:
+        src: templates/kube-apiserver.service.j2
+        dest: /etc/systemd/system/kube-apiserver.service
+      vars:
+        INTERNAL_IP: "{{ private_ip }}"
+        CONTROLLERS: "{{ groups['controllers'] }}"
+
+    - name: Copy the Kubernetes Controller Manager kubeconfig file
+      copy:
+        src: "{{ work_path }}/{{ item }}"
+        dest: /var/lib/kubernetes/
+      with_items:
+        - kube-controller-manager.kubeconfig
+
+    - name: Create the kube-controller-manager.service systemd unit file
+      template:
+        src: templates/kube-controller-manager.service.j2
+        dest: /etc/systemd/system/kube-controller-manager.service
+
+    - name: Copy the kube-scheduler kubeconfig into place
+      copy:
+        src: "{{ work_path }}/{{ item }}"
+        dest: /var/lib/kubernetes/
+      with_items:
+        - kube-scheduler.kubeconfig
+
+    - name: Create the kube-scheduler.yaml configuration file
+      template:
+        src: templates/kube-scheduler.yaml.j2
+        dest: /etc/kubernetes/config/kube-scheduler.yaml
+
+    - name: Create the kube-scheduler.service systemd unit file
+      template:
+        src: templates/kube-scheduler.service.j2
+        dest: /etc/systemd/system/kube-scheduler.service
+
+
+    - name: Start the Controller Services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: True
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+
+
+# Enable HTTP Health Checks
+    - name: Install a basic web server to handle HTTP health checks
+      apt:
+        name: nginx
+        state: present
+
+    - name: Create nginx kubernetes health check config
+      template:
+        src: templates/kubernetes.default.svc.cluster.local.j2
+        dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+
+    - name: Enable nginx kubernetes health check config
+      file: 
+        src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+        dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+        state: link
+      notify: restart nginx
+
+    - name: Start the nginx service
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: True
+      with_items:
+        - nginx
+
+
+# RBAC for Kubelet Authorization
+
+    - name: Copy admin.kubeconfig file
+      copy:
+        src: "{{ work_path }}/{{ item }}"
+        dest: /tmp
+      with_items:
+        - admin.kubeconfig
+
+    - name: copy role yaml
+      copy:
+        src: "{{ item }}"
+        dest: /tmp
+      with_items:
+        - files/system_kube-apiserver-to-kubelet.yaml
+        - files/system_kube-apiserver-to-kubelet_bind.yaml
+
+    - name: Create the system:kube-apiserver-to-kubelet ClusterRole with permissions to access the Kubelet API and perform most common tasks associated with managing pods
+      run_once: true
+      shell: "kubectl apply --kubeconfig /tmp/admin.kubeconfig -f {{ item }}"
+      with_items:
+        - /tmp/system_kube-apiserver-to-kubelet.yaml
+        - /tmp/system_kube-apiserver-to-kubelet_bind.yaml
+
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+- name: Provision a Network Load Balancer
+  hosts: localhost
+  gather_facts: no
+
+# The Kubernetes Frontend Load Balancer
+  tasks:
+
+    # pip install --upgrade google-api-python-client
+    - name: Create HTTP HealthCheck
+      gcp_healthcheck:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        healthcheck_name: kubernetes
+        healthcheck_type: HTTP
+        host_header: "kubernetes.default.svc.cluster.local"
+        request_path: /healthz
+        state: present
+
+    - name: Create a firewall rule for loadbalancer
+      gce_net:
+        project_id: "{{ project_id }}"
+        credentials_file: "{{ credentials_file }}"
+        service_account_email: "{{ service_account_email }}"
+        name: kubernetes-the-hard-way
+        fwname: "kubernetes-the-hard-way-allow-health-check"
+        allowed: "{{ item }}"
+        state: "present"
+        src_range: ['209.85.152.0/22','209.85.204.0/22','35.191.0.0/16']
+      with_items:
+        - tcp
+
+    - name: list kubernetes-target-pool
+      shell: gcloud compute target-pools list --filter="region":{{ region }}
+      changed_when: False
+      register: list_target_pools
+
+    - name: create kubernetes-target-pool
+      shell: gcloud compute target-pools create kubernetes-target-pool --http-health-check kubernetes  --region {{ region }}
+      when: "'kubernetes-target-pool' not in list_target_pools.stdout"
+
+    - name: add-instances kubernetes-target-pool
+      shell: gcloud compute target-pools add-instances kubernetes-target-pool --instances {{hostvars[item].inventory_hostname}} --instances-zone {{ zone }}
+      with_items: "{{groups['controllers']}}"
+
+    - name: list forwarding rules
+      shell: gcloud compute forwarding-rules list
+      changed_when: False
+      register: list_forwarding_rules
+
+    - name: Create Forwarding_Rule w/reserved static address
+      shell: >
+        gcloud compute forwarding-rules create kubernetes-forwarding-rule
+        --address {{ kube_ip.address }}
+        --ports 6443
+        --region {{ kube_ip.region }}
+        --target-pool kubernetes-target-pool
+      when: "'kubernetes-forwarding-rule' not in list_forwarding_rules.stdout"
+
+#
+# Bootstrapping the Kubernetes Worker Nodes
+# https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/09-bootstrapping-kubernetes-workers.md
+- name: Bootstrapping the Kubernetes Worker Nodes
+  hosts: workers
+  gather_facts: no
+  become: yes
+  tasks:
+
+    - name: Install the OS dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - socat
+        - conntrack
+        - ipset
+
+    - name: Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance
+      copy:
+        src: "{{ work_path }}/{{ item }}.kubeconfig"
+        dest: /tmp/
+      with_items:
+        - "{{ inventory_hostname }}"
+        - kube-proxy
+
+
+    - name : Download and Install Worker Binaries
+      get_url:
+        url: "{{ item }}"
+        dest: /tmp/
+      with_items:
+        - https://github.com/kubernetes-incubator/cri-tools/releases/download/v1.0.0-beta.0/crictl-v1.0.0-beta.0-linux-amd64.tar.gz
+        - https://storage.googleapis.com/kubernetes-the-hard-way/runsc
+        - https://github.com/opencontainers/runc/releases/download/v1.0.0-rc5/runc.amd64
+        - https://github.com/containernetworking/plugins/releases/download/v0.6.0/cni-plugins-amd64-v0.6.0.tgz
+        - https://github.com/containerd/containerd/releases/download/v1.1.0/containerd-1.1.0.linux-amd64.tar.gz
+        - https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl
+        - https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kube-proxy
+        - https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubelet
+
+    - name: Create the installation directories
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /etc/cni/net.d
+        - /opt/cni/bin
+        - /var/lib/kubelet
+        - /var/lib/kube-proxy
+        - /var/lib/kubernetes
+        - /var/run/kubernetes
+
+    - name: Install the worker kube binaries
+      copy:
+        src: /tmp/{{ item }}
+        dest: /usr/local/bin/
+        remote_src: true
+      with_items:
+        - kubectl
+        - kube-proxy
+        - kubelet
+        - runsc
+
+    - name: Install the worker kube binaries
+      copy:
+        src: /tmp/runc.amd64
+        dest: /usr/local/bin/runc
+        remote_src: true
+
+    - name: Set executable the worker kube binaries
+      file:
+        path: /usr/local/bin/{{ item }}
+        mode: 0754
+      with_items:
+        - kubectl
+        - kube-proxy
+        - kubelet
+        - runsc
+        - runc
+
+
+    - name: Unpack the worker  crictl cni-plugins binaries
+      unarchive:
+        src: "/tmp/{{ item.src }}"
+        dest: "{{ item.dest }}"
+        remote_src: true
+      with_items:
+        - {"src": "crictl-v1.0.0-beta.0-linux-amd64.tar.gz", "dest": "/usr/local/bin/"}
+        - {"src": "cni-plugins-amd64-v0.6.0.tgz", "dest": "/opt/cni/bin/" }
+
+    - name: Unpack the worker containerd
+      unarchive:
+        src: /tmp/{{ item }}
+        dest: /
+        remote_src: true
+      with_items:
+        - containerd-1.1.0.linux-amd64.tar.gz
+
+    - name: Create the bridge network configuration file
+      template:
+        src: templates/10-bridge.conf.j2
+        dest: /etc/cni/net.d/10-bridge.conf
+      vars:
+        POD_CIDR: "{{ pod_cidr }}"
+
+    - name: Create the loopback network configuration file
+      copy:
+        src: files/99-loopback.conf
+        dest: /etc/cni/net.d/99-loopback.conf
+
+# Configure containerd
+    - name: Create the containerd configuration dir
+      file:
+        path: /etc/containerd
+        state: directory
+
+
+    - name: Create the containerd configuration file
+      copy:
+        src: files/config.toml
+        dest: /etc/containerd/config.toml
+
+    - name: Create the containerd.service systemd unit file
+      copy:
+        src: files/containerd.service
+        dest: /etc/systemd/system/containerd.service
+
+# Configure the Kubelet
+    - name: Copy certificates on worker
+      copy:
+        src: "{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - {"src":"{{ work_path }}/{{inventory_hostname}}-key.pem", "dest":"/var/lib/kubelet/"}
+        - {"src":"{{ work_path }}/{{inventory_hostname}}.pem", "dest":"/var/lib/kubelet/"}
+        - {"src":"{{ work_path }}/{{inventory_hostname}}.kubeconfig", "dest":"/var/lib/kubelet/kubeconfig"}
+        - {"src":"{{ work_path }}/ca.pem", "dest":"/var/lib/kubernetes/"}
+        - {"src":"{{ work_path }}/kube-proxy.kubeconfig", "dest":"/var/lib/kube-proxy/kubeconfig"}
+        - {"src":"files/kube-proxy-config.yaml", "dest":"/var/lib/kube-proxy/kube-proxy-config.yaml"}
+
+    - name: Create the kubelet-config.yaml configuration file
+      template:
+        src: templates/kubelet-config.yaml.j2
+        dest: /var/lib/kubelet/kubelet-config.yaml
+      vars:
+        POD_CIDR: "{{ pod_cidr }}"
+        HOSTNAME: "{{ inventory_hostname}}"
+
+    - name: Create the kubelet.service systemd unit file
+      copy:
+        src: files/kubelet.service
+        dest: /etc/systemd/system/kubelet.service
+
+# Configure the Kubernetes Proxy
+    - name: Create the kube-proxy.service systemd unit file
+      copy:
+        src: files/kube-proxy.service
+        dest: /etc/systemd/system/kube-proxy.service
+
+
+    - name: Start the Worker Services
+      systemd:
+        name: "{{ item}}"
+        state: started
+        enabled: True
+      with_items:
+        - containerd
+        - kubelet
+        - kube-proxy
+
+
+#
+# Configuring kubectl for Remote Access
+#
+- name: Configure kubernetes
+  # hosts: all
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Generate a kubeconfig file suitable for authenticating as the admin user
+      shell: >
+        kubectl config set-cluster kubernetes-the-hard-way
+        --certificate-authority={{ work_path }}/ca.pem 
+        --embed-certs=true 
+        --server=https://{{ kube_ip.address}}:6443
+        &&
+        kubectl config set-credentials admin
+        --client-certificate={{ work_path }}/admin.pem
+        --client-key={{ work_path }}/admin-key.pem
+        &&
+        kubectl config set-context kubernetes-the-hard-way
+        --cluster=kubernetes-the-hard-way
+        --user=admin
+        &&
+        kubectl config use-context kubernetes-the-hard-way
+
+    - name: list_compute_routes
+      shell: "gcloud compute routes list --filter 'network: kubernetes-the-hard-way'"
+      changed_when: False
+      register: list_compute_routes
+
+    - name: Create network routes for each worker instance
+      shell: >
+        gcloud compute routes create {{hostvars[item].kubernetes_route}}
+        --network kubernetes-the-hard-way
+        --next-hop-address {{ hostvars[item].private_ip}}
+        --destination-range {{ hostvars[item].pod_cidr}}
+      with_items: "{{ groups['workers']}}"
+      when: "hostvars[item].kubernetes_route not in list_compute_routes.stdout"
+
+#
+# Deploying the DNS Cluster Add-on
+#
+    - name: List the pods created by the kube-dns deployment
+      shell: kubectl get pods -l k8s-app=kube-dns -n kube-system
+      changed_when: False
+      register: list_kube_dns
+
+    - name: Deploy the kube-dns cluster add-on
+      shell: kubectl create -f https://storage.googleapis.com/kubernetes-the-hard-way/kube-dns.yaml
+      when: "'kube-dns' not in list_kube_dns.stdout"

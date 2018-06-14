@@ -1,0 +1,13 @@
+project = "project-id"
+
+zone = "europe-west4-c"
+
+cluster_name = "reddit-cluster"
+
+machine_type = "g1-small"
+
+disk_size_gb = 20
+
+node_count = 2
+
+kubernetes_version = "1.8.10-gke.0"

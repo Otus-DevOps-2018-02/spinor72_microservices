@@ -10,7 +10,6 @@ COPY Gemfile* $APP_HOME/
 # hadolint ignore=DL3018
 RUN apk --no-cache add ruby ruby-io-console ruby-bundler curl ruby-dev build-base \
  && bundle install \
- && apk --no-cache del ruby-dev build-base ruby-bundler \
  && rm -rf /usr/lib/ruby/gems/*/cache/* \
           /var/cache/apk/* \
           /tmp/* \
