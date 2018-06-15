@@ -20,7 +20,7 @@ spec:
         component: post
     spec:
       containers:
-      - image: spinor72/post:logging
+      - image: spinor72/post:latest
         name: post
         env:
         - name: POST_DATABASE_HOST

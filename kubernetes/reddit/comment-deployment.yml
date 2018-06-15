@@ -20,7 +20,7 @@ spec:
         component: comment
     spec:
       containers:
-      - image: spinor72/comment:logging
+      - image: spinor72/comment:latest
         name: comment
         env:
         - name: COMMENT_DATABASE_HOST

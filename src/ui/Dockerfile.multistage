@@ -1,4 +1,4 @@
-FROM alpine:3.2 as builder
+FROM alpine:3.6 as builder
 
 ENV APP_HOME /app
 ENV GEM_HOME /usr/local/bundle
@@ -20,11 +20,11 @@ COPY Gemfile* $APP_HOME/
 RUN bundle install --without development test
 
 
-FROM alpine:3.2
+FROM alpine:3.6
 
 ENV APP_HOME /app
 ENV GEM_HOME /usr/local/bundle
-
+ENV RAILS_ENV production
 # hadolint ignore=DL3018
 RUN apk --no-cache add ruby  \
  && rm -rf /var/cache/apk/* \

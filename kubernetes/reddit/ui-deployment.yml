@@ -20,7 +20,7 @@ spec:
         component: ui
     spec:
       containers:
-      - image: spinor72/ui:logging
+      - image: spinor72/ui:latest
         name: ui
         env:
         - name: ENV
