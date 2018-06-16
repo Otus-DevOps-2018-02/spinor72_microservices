@@ -15,8 +15,16 @@ resource "google_container_cluster" "cluster" {
 
   addons_config {
     kubernetes_dashboard {
-      disabled = true
+      disabled = "${var.disable_dashboard}"
     }
+
+    network_policy_config {
+      disabled = "${var.disable_networkpolicy}"
+    }
+  }
+
+  network_policy {
+    enabled = "${var.disable_networkpolicy ? 0 : 1}"
   }
 
   node_config {

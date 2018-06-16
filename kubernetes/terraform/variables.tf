@@ -30,3 +30,13 @@ variable node_count {
   description = "The number of nodes to create in this cluster (not including the Kubernetes master)"
   default     = 2
 }
+
+variable disable_dashboard {
+  description = "Disable Kubernetes dasboard"
+  default     = false
+}
+
+variable disable_networkpolicy {
+  description = "Disable Kubernetes NetworkPolicy"
+  default     = false
+}
