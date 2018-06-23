@@ -57,7 +57,7 @@ resource "google_container_node_pool" "bigpool" {
 
   node_config {
     machine_type = "n1-standard-2"
-    disk_size_gb = "${var.disk_size_gb}"
+    disk_size_gb = "40"
 
     oauth_scopes = [
       "https://www.googleapis.com/auth/compute",
