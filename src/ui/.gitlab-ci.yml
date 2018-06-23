@@ -35,6 +35,7 @@ release:
   script:
     - setup_docker
     - release
+    - trigger_deploy
   only:
     - master
 
@@ -165,6 +166,13 @@ stop_review:
     docker pull "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
     docker tag "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
     docker push "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
+    echo ""
+  }
+
+  function trigger_deploy() {
+
+    echo "Trigger deploy ..."
+    wget --post-data "token=${DEPLOY_TRIGGER_TOKEN}&ref=${CI_COMMIT_REF_NAME}" http://gitlab-gitlab/api/v4/projects/${CI_PROJECT_NAMESPACE}%2F${DEPLOY_PROJECT_NAME}/trigger/pipeline
     echo ""
   }
 
