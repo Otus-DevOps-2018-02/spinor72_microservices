@@ -8,12 +8,12 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 data:
-  external_scheme: https
-  external_hostname: gitlab.{{ .Values.baseDomain }}
-  registry_external_scheme: https
-  registry_external_hostname: registry.{{ .Values.baseDomain }}
-  mattermost_external_scheme: https
-  mattermost_external_hostname: mattermost.{{ .Values.baseDomain }}
+  external_scheme: http
+  external_hostname: {{ template "fullname" . }}
+  registry_external_scheme: http
+  registry_external_hostname: {{ template "fullname" . }}
+  mattermost_external_scheme: http
+  mattermost_external_hostname: {{ template "fullname" . }}
   mattermost_app_uid: {{ .Values.mattermostAppUID }}
   postgres_user: gitlab
   postgres_db: gitlab_production
