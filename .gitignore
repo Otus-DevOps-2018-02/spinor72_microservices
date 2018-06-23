@@ -30,3 +30,5 @@ tower_cli.cfg
 *.pem
 *.csr
 *-csr.json
+# Gitlab-CI
+Gitlab_ci/
