@@ -6,13 +6,14 @@ resource "google_container_cluster" "cluster" {
 
   min_master_version = "${var.kubernetes_version}"
   node_version       = "${var.kubernetes_version}"
-  enable_legacy_abac = false
+  enable_legacy_abac = true
+
+  # enable_legacy_abac = false not supported by gitlab omnibus
 
   master_auth {
     username = ""
     password = ""
   }
-
   addons_config {
     kubernetes_dashboard {
       disabled = "${var.disable_dashboard}"
@@ -22,11 +23,9 @@ resource "google_container_cluster" "cluster" {
       disabled = "${var.disable_networkpolicy}"
     }
   }
-
   network_policy {
     enabled = "${var.disable_networkpolicy ? 0 : 1}"
   }
-
   node_config {
     machine_type = "${var.machine_type}"
     disk_size_gb = "${var.disk_size_gb}"
@@ -44,9 +43,34 @@ resource "google_container_cluster" "cluster" {
 
     tags = ["${var.cluster_name}"]
   }
-
   provisioner "local-exec" {
     command = "gcloud container clusters get-credentials ${var.cluster_name} --zone ${var.zone} --project ${var.project}"
+  }
+}
+
+resource "google_container_node_pool" "bigpool" {
+  name       = "bigpool"
+  project    = "${var.project}"
+  zone       = "${var.zone}"
+  cluster    = "${google_container_cluster.cluster.name}"
+  node_count = 1
+
+  node_config {
+    machine_type = "n1-standard-2"
+    disk_size_gb = "${var.disk_size_gb}"
+
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+    ]
+
+    labels {
+      app = "gitlab"
+    }
+
+    tags = ["${var.cluster_name}"]
   }
 }
 
