@@ -1,0 +1,8 @@
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: spinor72/ui
+  tag: latest
