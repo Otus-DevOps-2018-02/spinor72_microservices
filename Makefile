@@ -8,8 +8,9 @@ ifeq ($(USER_NAME),)
 endif
 
 # сборка образов, всех сразу или отдельно
-.PHONY: build build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
-build: build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal
+.PHONY: build build_src build_ui build_comment build_post build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
+build: build_src build_prometheus build_mongodb_exporter build_cloudprober build_alertmanager build_grafana build_autoheal build_fluentd
+build_src: build_ui build_comment build_post 
 build_ui:
 	cd src/ui && bash docker_build.sh
 build_comment:
@@ -28,6 +29,9 @@ build_grafana:
 	cd monitoring/grafana && docker build --build-arg GRAFANA_VERSION=$(GRAFANA_VERSION) -t $(USER_NAME)/grafana:$(GRAFANA_VERSION) .
 build_autoheal:
 	cd monitoring/autoheal && docker build  -t $(USER_NAME)/autoheal:latest .
+
+build_fluentd:
+	cd logging/fluentd && docker build --build-arg FLUENTD_VERSION=$(FLUENTD_VERSION)  -t $(USER_NAME)/fluentd:$(FLUENTD_VERSION) .
 
 
 # заливка образов в репозиторий, требуется предварителньо залогиниться
@@ -86,6 +90,20 @@ down_ah:
 log_ah:
 	cd monitoring/autoheal && docker-compose logs --follow 
 
+.PHONY: up_log down_log log_log
+up_log:
+	cd docker && docker-compose -f docker-compose-logging.yml up -d
+down_log:
+	cd docker && docker-compose -f docker-compose-logging.yml down
+log_log:
+	cd docker && docker-compose -f docker-compose-logging.yml logs --follow 
+
+.PHONY: up_net down_net
+up_net:
+	cd docker && docker-compose -f docker-compose-net.yml up -d
+down_net:
+	cd docker && docker-compose -f docker-compose-net.yml down
+
 
 # инфраструктура
 .PHONY: machine firewall
@@ -111,11 +129,19 @@ machine:
 	docker-host
 	docker-machine ssh docker-host gcloud auth list
 	docker-machine ip docker-host
+static_ip:
+	gcloud compute instances delete-access-config docker-host --access-config-name "external-nat" 
+	gcloud compute instances add-access-config docker-host --access-config-name "external-nat" --address $(GOOGLE_STATIC_IP)
+	docker-machine regenerate-certs docker-host
 
-
-firewall: firewall_puma firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver
+.PHONY: firewall_puma firewall_mon firewall_logging firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager 
+.PHONY: firewall_docker_metrics firewall_stackdriver firewall_awx firewall_logging
+firewall: firewall_puma firewall_mon firewall_logging 
+# правило дял приложения
 firewall_puma:
 	gcloud compute firewall-rules create puma-default --allow tcp:9090
+# правила дял сервисов мониторинга
+firewall_mon: firewall_prom firewall_cadvisor firewall_grafana firewall_alertmanager firewall_docker_metrics firewall_stackdriver firewall_awx
 firewall_prom:
 	gcloud compute firewall-rules create prometheus-default --allow tcp:9292
 firewall_cadvisor:
@@ -130,6 +156,11 @@ firewall_stackdriver:
 	gcloud compute firewall-rules create stackdriver-exporter-default --allow tcp:9255
 firewall_awx:
 	gcloud compute firewall-rules create awx-default --allow tcp:8052
+# правила для логинга
+firewall_logging:
+	gcloud compute firewall-rules create allow-tcp-5601-default --allow tcp:5601
+	gcloud compute firewall-rules create allow-tcp-9411-default --allow tcp:9411
+
 
 .PHONY: test_env clean clean_all
 test_env:
