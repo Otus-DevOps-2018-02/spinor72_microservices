@@ -7,6 +7,8 @@ resource "google_container_cluster" "cluster" {
   min_master_version = "${var.kubernetes_version}"
   node_version       = "${var.kubernetes_version}"
   enable_legacy_abac = true
+  logging_service    = "none"
+  monitoring_service = "none"
 
   # enable_legacy_abac = false not supported by gitlab omnibus
 
