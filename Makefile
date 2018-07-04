@@ -232,3 +232,8 @@ k8s_nginx_ingress:
 	# helm install stable/nginx-ingress --name nginx --namespace dev
 k8s_prometheus:
 	cd kubernetes/Charts/prometheus && helm upgrade prom . -f custom_values.yaml --install --namespace dev
+
+k8s_reddit:
+	cd kubernetes/Charts/reddit && helm upgrade reddit-test . --install
+	cd kubernetes/Charts/reddit && helm upgrade production --namespace production . --install
+	cd kubernetes/Charts/reddit && helm upgrade staging --namespace staging . --install
