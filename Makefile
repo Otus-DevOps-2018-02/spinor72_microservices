@@ -227,3 +227,8 @@ k8s_helm_init:
 	kubectl get pods -n kube-system --selector app=helm
 k8s_helm_gitlab:
 	helm install --name gitlab --namespace dev   kubernetes/Charts/gitlab-omnibus -f kubernetes/Charts/gitlab-omnibus/values.yaml
+k8s_nginx_ingress:
+	helm install stable/nginx-ingress --name nginx --namespace dev
+	# helm install stable/nginx-ingress --name nginx --namespace dev
+k8s_prometheus:
+	cd kubernetes/Charts/prometheus && helm upgrade prom . -f custom_values.yaml --install --namespace dev
