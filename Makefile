@@ -238,3 +238,10 @@ k8s_reddit:
 	cd kubernetes/Charts/reddit && helm upgrade reddit-test . --install
 	cd kubernetes/Charts/reddit && helm upgrade production --namespace production . --install
 	cd kubernetes/Charts/reddit && helm upgrade staging --namespace staging . --install
+
+k8s_grafana:
+	helm upgrade --install grafana stable/grafana  \
+	--set "service.type=NodePort" \
+	--set "ingress.enabled=true" \
+	--set "ingress.hosts={reddit-grafana}"
+	kubectl get secret --namespace default grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
