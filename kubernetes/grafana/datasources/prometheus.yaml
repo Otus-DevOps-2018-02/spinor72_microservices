@@ -1,0 +1,12 @@
+deleteDatasources:
+  - name: prometheus
+    orgId: 1
+datasources:
+  - access: proxy
+    editable: true
+    is_default: true
+    name: prometheus
+    orgId: 1
+    type: prometheus
+    url: http://prom-prometheus-server
+    version: 1

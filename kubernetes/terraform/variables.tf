@@ -31,6 +31,11 @@ variable node_count {
   default     = 2
 }
 
+variable big_node_count {
+  description = "The number of big nodes to create in this cluster (not including the Kubernetes master)"
+  default     = 2
+}
+
 variable disable_dashboard {
   description = "Disable Kubernetes dasboard"
   default     = false

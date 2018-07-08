@@ -4,7 +4,7 @@ rbac:
 alertmanager:
   ## If false, alertmanager will not be installed
   ##
-  enabled: false
+  enabled: true
 
   # Defines the serviceAccountName to use when `rbac.create=false`
   serviceAccountName: default
@@ -17,7 +17,7 @@ alertmanager:
   ##
   image:
     repository: prom/alertmanager
-    tag: v0.10.0
+    tag: v0.14.0
     pullPolicy: IfNotPresent
 
   ## Additional alertmanager container arguments
@@ -43,7 +43,7 @@ alertmanager:
   ingress:
     ## If true, alertmanager Ingress will be created
     ##
-    enabled: false
+    enabled: true
 
     ## alertmanager Ingress annotations
     ##
@@ -54,8 +54,8 @@ alertmanager:
     ## alertmanager Ingress hostnames
     ## Must be provided if Ingress is enabled
     ##
-    hosts: []
-    #   - alertmanager.domain.com
+    hosts:
+      - reddit-alertmanager
 
     ## alertmanager Ingress TLS configuration
     ## Secrets must be manually created in the namespace
@@ -324,12 +324,12 @@ server:
   ##
   image:
     repository: prom/prometheus
-    tag: v2.0.0
+    tag: v2.3.1
     pullPolicy: IfNotPresent
 
   ## (optional) alertmanager hostname
   ## only used if alertmanager.enabled = false
-  alertmanagerHostname: ""
+  ##alertmanagerHostname: ""
 
   ## The URL prefix at which the container can be accessed. Useful in the case the '-web.external-url' includes a slug
   ## so that the various internal URLs are still able to access as they are in the default case.
@@ -339,6 +339,11 @@ server:
   ## Additional Prometheus server container arguments
   ##
   extraArgs: {}
+
+  global:
+    ## How frequently to scrape targets by default
+    ##
+    scrape_interval: 15s
 
   ## Additional Prometheus server hostPath mounts
   ##
@@ -369,7 +374,7 @@ server:
     ## Must be provided if Ingress is enabled
     ##
     hosts:
-     - reddit-prometheus
+      - reddit-prometheus
 
     ## Prometheus server Ingress TLS configuration
     ## Secrets must be manually created in the namespace
@@ -565,37 +570,53 @@ pushgateway:
     type: ClusterIP
 
 ## alertmanager ConfigMap entries
-##
-alertmanagerFiles:
-  alertmanager.yml: |-
-    global:
-      # slack_api_url: ''
-
-    receivers:
-      - name: default-receiver
-        # slack_configs:
-        #  - channel: '@you'
-        #    send_resolved: true
-
-    route:
-      group_wait: 10s
-      group_interval: 5m
-      receiver: default-receiver
-      repeat_interval: 3h
+###
+#alertmanagerFiles:
+#  alertmanager.yml:
+#    global:
+#    #  slack_api_url: ''
+#
+#    receivers:
+#      - name: 'default-receiver'
+#        slack_configs:
+#          - channel: '#andrei_ryzhkov'
+#
+#    route:
+#      routes:
+#        - match:
+#            severity: page
+#          receiver: 'default-receiver'
 
 ## Prometheus server ConfigMap entries
 ##
 serverFiles:
-  alerts: {}
+  alerts:
+    groups:
+    - name: alert.rules
+      rules:
+      - alert: NodeDown
+        expr: up{job="kubernetes-nodes"} == 0
+        for: 30s
+        labels:
+          severity: page
+        annotations:
+          description: '{{ $labels.kubernetes_io_hostname }} of job {{ $labels.job }} has been down for more than 30 sec'
+          summary: 'Node {{ $labels.kubernetes_io_hostname }} down'
+      - alert: APIDown
+        expr: up{job="kubernetes-apiservers"} == 0
+        for: 30s
+        labels:
+          severity: page
+        annotations:
+          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 30 sec'
+          summary: 'API server {{ $labels.instance }} down'
+
   rules: {}
 
   prometheus.yml:
     rule_files:
       - /etc/config/rules
       - /etc/config/alerts
-
-    global:
-      scrape_interval: 30s
 
     scrape_configs:
       - job_name: prometheus

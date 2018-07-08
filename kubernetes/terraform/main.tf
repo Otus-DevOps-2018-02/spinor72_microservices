@@ -55,7 +55,7 @@ resource "google_container_node_pool" "bigpool" {
   project    = "${var.project}"
   zone       = "${var.zone}"
   cluster    = "${google_container_cluster.cluster.name}"
-  node_count = 1
+  node_count = "${var.big_node_count}"
 
   node_config {
     machine_type = "n1-standard-2"
@@ -69,7 +69,8 @@ resource "google_container_node_pool" "bigpool" {
     ]
 
     labels {
-      app = "gitlab"
+      app         = "gitlab"
+      elastichost = "true"
     }
 
     tags = ["${var.cluster_name}"]
