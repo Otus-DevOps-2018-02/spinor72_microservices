@@ -45,3 +45,8 @@ variable disable_networkpolicy {
   description = "Disable Kubernetes NetworkPolicy"
   default     = false
 }
+
+variable enable_legacy_abac {
+  description = "Enable legacy ABAC"
+  default     = false
+}
