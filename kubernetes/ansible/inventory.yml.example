@@ -1,0 +1,23 @@
+all:
+  vars:
+    project_id: "your-project-id"
+    credentials_file: /home/username/.config/gcloud/docker-ea4939aad790.json
+    service_account_email: 000000000000-compute@developer.gserviceaccount.com
+    region: "europe-west4"
+    zone: "europe-west4-b"
+
+    work_path: "../the_hard_way"
+    clean_work_path: no
+
+    machine_type: n1-standard-1
+    controllers_count: 3
+    workers_count: 3
+
+    ansible_ssh_private_key_file: /home/username/.ssh/appuser
+    ssh_pub_key: "{{lookup('file', '/home/username/.ssh/appuser.pub')  }}"
+    ansible_user: appuser
+
+local:
+  hosts:
+    localhost:
+      ansible_connection: local

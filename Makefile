@@ -184,3 +184,24 @@ alert:
 populate_awx:
 	echo "host=$(TOWER_HOST) username=$(TOWER_USERNAME) password=$(TOWER_PASSWORD)" > monitoring/autoheal/ansible/playbooks/tower_cli.cfg
 	ansible-playbook -i "localhost," -c local monitoring/autoheal/ansible/playbooks/awx-autoheal.yml
+
+.PHONY: kube_deploy_reddit kube_deploy_mongo kube_deploy_post kube_deploy_comment kube_deploy_mongo
+k8s_deploy_reddit: k8s_deploy_mongo k8s_deploy_post k8s_deploy_comment k8s_deploy_ui
+k8s_deploy_post:
+	cd kubernetes/reddit && envsubst < post-deployment.yml | kubectl apply -f -
+k8s_deploy_comment:
+	cd kubernetes/reddit && envsubst < comment-deployment.yml | kubectl apply -f -
+k8s_deploy_mongo:
+	cd kubernetes/reddit && envsubst < mongo-deployment.yml | kubectl apply -f -
+k8s_deploy_ui:
+	cd kubernetes/reddit && envsubst < ui-deployment.yml | kubectl apply -f -
+
+
+k8s_install_thw:
+	cd kubernetes/ansible && ansible-playbook -i inventory.yml install_k8s_thw_playbook.yml
+
+k8s_clean_thw:
+	cd kubernetes/ansible && ansible-playbook -i inventory.yml cleanup_k8s_thw_playbook.yml
+
+k8s_utils:
+	cd kubernetes/ansible && ansible-playbook -i inventory.yml --ask-become-pass kubectl.yml
