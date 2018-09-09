@@ -13,5 +13,5 @@ spec:
     protocol: TCP
     targetPort: 9292
   selector:
-      app: reddit
-      component: ui
+    app: reddit
+    component: ui
