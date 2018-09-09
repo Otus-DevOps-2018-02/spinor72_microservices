@@ -13,8 +13,19 @@ build: build_src build_prometheus build_mongodb_exporter build_cloudprober build
 build_src: build_ui build_comment build_post 
 build_ui:
 	cd src/ui && bash docker_build.sh
+build_ui_multistage:
+	cd src/ui ;\
+	echo `git show --format="%h" HEAD | head -1` > build_info.txt ;\
+	echo `git rev-parse --abbrev-ref HEAD` >> build_info.txt ;\
+	docker build -f Dockerfile.multistage -t $(USER_NAME)/ui . 
 build_comment:
 	cd src/comment && bash docker_build.sh
+build_comment_multistage:
+	cd src/comment ;\
+	echo `git show --format="%h" HEAD | head -1` > build_info.txt ;\
+	echo `git rev-parse --abbrev-ref HEAD` >> build_info.txt ;\
+	docker build -f Dockerfile.multistage -t $(USER_NAME)/comment . 
+
 build_post:
 	cd src/post-py && bash docker_build.sh
 build_prometheus:
@@ -205,3 +216,8 @@ k8s_clean_thw:
 
 k8s_utils:
 	cd kubernetes/ansible && ansible-playbook -i inventory.yml --ask-become-pass kubectl.yml
+
+k8s_terraform:
+	cd kubernetes/terraform && terraform apply
+k8s_terraform_destroy:
+	cd kubernetes/terraform && terraform destroy
