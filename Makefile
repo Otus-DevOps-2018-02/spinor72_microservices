@@ -221,3 +221,9 @@ k8s_terraform:
 	cd kubernetes/terraform && terraform apply
 k8s_terraform_destroy:
 	cd kubernetes/terraform && terraform destroy
+k8s_helm_init:
+	kubectl apply -f kubernetes/tiller/tiller.yml
+	helm init --service-account tiller
+	kubectl get pods -n kube-system --selector app=helm
+k8s_helm_gitlab:
+	helm install --name gitlab --namespace dev   kubernetes/Charts/gitlab-omnibus -f kubernetes/Charts/gitlab-omnibus/values.yaml
