@@ -227,3 +227,47 @@ k8s_helm_init:
 	kubectl get pods -n kube-system --selector app=helm
 k8s_helm_gitlab:
 	helm install --name gitlab --namespace dev   kubernetes/Charts/gitlab-omnibus -f kubernetes/Charts/gitlab-omnibus/values.yaml
+
+k8s_nginx_ingress:
+	helm install stable/nginx-ingress --name nginx
+	# helm install stable/nginx-ingress --name nginx --namespace dev
+k8s_prometheus:
+	cd kubernetes/Charts/prometheus && helm upgrade prom . -f custom_values.yaml -f alertmanager_config.yaml --install
+
+k8s_reddit:
+	cd kubernetes/Charts/reddit && helm upgrade reddit-test . --install
+	cd kubernetes/Charts/reddit && helm upgrade production --namespace production . --install
+	cd kubernetes/Charts/reddit && helm upgrade staging --namespace staging . --install
+
+k8s_grafana_provisioning:
+	kubectl create configmap grafana-prometheus-datasource  --from-file=prometheus.yaml=kubernetes/grafana/datasources/prometheus.yaml
+	kubectl label configmap grafana-prometheus-datasource grafana_datasource=1
+	kubectl create configmap grafana-business-logic-dashboard  --from-file=bl-dashboard.json=kubernetes/grafana/dashboards/bl.json
+	kubectl label configmap grafana-business-logic-dashboard grafana_dashboard=1
+	kubectl create configmap grafana-ui-dashboard  --from-file=ui-dashboard.json=kubernetes/grafana/dashboards/ui.json
+	kubectl label configmap grafana-ui-dashboard grafana_dashboard=1
+	kubectl create configmap grafana-k8s-dashboard  --from-file=k8s-dashboard.json=kubernetes/grafana/dashboards/k8s.json
+	kubectl label configmap grafana-k8s-dashboard grafana_dashboard=1
+	kubectl create configmap grafana-k8s-deployment-dashboard  --from-file=k8s-deployment-dashboard.json=kubernetes/grafana/dashboards/k8s-deployment.json
+	kubectl label configmap grafana-k8s-deployment-dashboard grafana_dashboard=1
+
+k8s_grafana:
+	helm upgrade --install grafana stable/grafana  \
+	--set "service.type=NodePort" \
+	--set "ingress.enabled=true" \
+	--set "ingress.hosts={reddit-grafana}" \
+	--set "sidecar.dashboards.enabled=true" \
+	--set "sidecar.dashboards.label=grafana_dashboard" \
+	--set "sidecar.datasources.enabled=true" \
+	--set "sidecar.datasources.label=grafana_datasource"
+	kubectl get secret --namespace default grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+k8s_efk:
+	cd kubernetes/Charts/efk && helm dep update && helm upgrade efk . --install
+
+k8s_kibana:
+	helm upgrade --install kibana stable/kibana \
+	--set "ingress.enabled=true" \
+	--set "ingress.hosts={reddit-kibana}" \
+	--set "env.ELASTICSEARCH_URL=http://elasticsearch-logging:9200" \
+	--version 0.1.1

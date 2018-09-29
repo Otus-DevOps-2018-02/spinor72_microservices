@@ -32,3 +32,4 @@ tower_cli.cfg
 *-csr.json
 # Gitlab-CI
 Gitlab_ci/
+kubernetes/Charts/prometheus/alertmanager_config.yaml

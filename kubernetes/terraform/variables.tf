@@ -31,6 +31,11 @@ variable node_count {
   default     = 2
 }
 
+variable big_node_count {
+  description = "The number of big nodes to create in this cluster (not including the Kubernetes master)"
+  default     = 2
+}
+
 variable disable_dashboard {
   description = "Disable Kubernetes dasboard"
   default     = false
@@ -38,5 +43,10 @@ variable disable_dashboard {
 
 variable disable_networkpolicy {
   description = "Disable Kubernetes NetworkPolicy"
+  default     = false
+}
+
+variable enable_legacy_abac {
+  description = "Enable legacy ABAC"
   default     = false
 }
